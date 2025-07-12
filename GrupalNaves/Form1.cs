@@ -1,167 +1,316 @@
-using System;
+ï»¿using System;
 using System.Drawing;
 using System.Windows.Forms;
 using System.Collections.Generic;
-using System.Linq;
-using System.Diagnostics; // Necesario para Debug.WriteLine
+using System.Diagnostics;
+
 
 namespace GrupalNaves
 {
     public partial class Form1 : Form
     {
         private Naves naveJugador;
-        private TipoAvion avionSeleccionado = TipoAvion.Avion1; // Valor inicial por defecto
+        private TipoAvion avionSeleccionado = TipoAvion.Avion1;
         private Movimiento gestorMovimiento;
         private List<Obstaculos> listaObstaculos;
+        private List<Torre> torres;
+        private List<Bala> balasTorreta;
+        // Temporizador para disparos de torretas
+        private System.Windows.Forms.Timer timerDisparoTorreta;
+        // Temporizador para actualizar las balas
+        private System.Windows.Forms.Timer timerActualizacionBalas;
+
+        private List<Bala> balasJugador;
+        private List<Bala> balasTorretas;
+
 
         public Form1()
         {
             InitializeComponent();
-            this.DoubleBuffered = true; // Habilita el doble búfer para evitar el parpadeo al dibujar
-            this.ClientSize = new Size(1080, 720); // Establece el tamaño de la ventana del juego
-            this.Text = "Juego de Naves Espaciales"; // Título de la ventana
+            Debug.WriteLine($"TamaÃ±o real del cliente: {this.ClientSize}");
 
-            listaObstaculos = new List<Obstaculos>(); // Inicializa la lista de obstáculos
+            // ConfiguraciÃ³n de la ventana
+            this.DoubleBuffered = true;
+            this.ClientSize = new Size(1920, 1080);
+            this.Text = "Juego de Naves Espaciales";
+            this.KeyPreview = true;
 
-            this.Paint += DibujarElementosJuego; // Asocia el método de dibujo al evento Paint del formulario
-            this.KeyPreview = true; // Esencial para que el formulario reciba eventos de teclado antes que otros controles
+            // Inicializar componentes
+            listaObstaculos = new List<Obstaculos>();
 
-            // --- LÍNEAS DE DEPURACIÓN PARA EVENTOS DE TECLADO EN Form1 ---
+            // Eventos
+            this.Paint += DibujarElementosJuego;
             this.KeyDown += Form1_DebugKeyDown;
             this.KeyUp += Form1_DebugKeyUp;
-            // --- FIN DE LAS LÍNEAS DE DEPURACIÓN ---
 
-            // Instancia el menú y se suscribe a su evento de selección
+            // Mostrar menÃº de selecciÃ³n
             Menu menuSeleccion = new Menu();
-            menuSeleccion.NaveSeleccionada += OnNaveSeleccionada; // Suscribe al evento
-            menuSeleccion.MostrarMenu(); // Muestra el menú
-
+            menuSeleccion.NaveSeleccionada += OnNaveSeleccionada;
+            menuSeleccion.MostrarMenu();
         }
 
-        // --- MÉTODOS DE DEPURACIÓN para la entrada de teclado de Form1 ---
         private void Form1_DebugKeyDown(object sender, KeyEventArgs e)
         {
-            Debug.WriteLine($"Form1 DEPURACIÓN: Tecla presionada - {e.KeyCode}");
+            Debug.WriteLine($"Tecla presionada: {e.KeyCode}");
         }
 
         private void Form1_DebugKeyUp(object sender, KeyEventArgs e)
         {
-            Debug.WriteLine($"Form1 DEPURACIÓN: Tecla soltada - {e.KeyCode}");
+            Debug.WriteLine($"Tecla soltada: {e.KeyCode}");
         }
-        // --- Fin de los MÉTODOS DE DEPURACIÓN ---
 
-        // Este método será llamado cuando el menú dispare el evento NaveSeleccionada
         private void OnNaveSeleccionada(TipoAvion tipo)
         {
-            this.avionSeleccionado = tipo; // Almacena la selección del usuario
-            InicializarJuego(); // Ahora podemos inicializar el juego con la nave correcta
+            this.avionSeleccionado = tipo;
+            InicializarJuego();
 
-            // Después de que el menú se cierra y antes de que Form1 se muestre completamente,
-            // nos aseguramos de que tenga el foco para recibir la entrada del teclado.
+            // Preparar el formulario para recibir input
             this.Focus();
-            this.ActiveControl = null; // Quita el foco de cualquier otro control que pudiera tenerlo
-            this.Select(); // Intenta seleccionar el propio formulario
-            this.Invalidate(); // Asegura que el formulario se redibuje con la nave
+            this.ActiveControl = null;
+            this.Select();
+            this.Invalidate();
         }
-
-        // Método para inicializar la nave del jugador y los obstáculos del juego
         private void InicializarJuego()
         {
+            // Inicializar torres con posiciones visibles
+            torres = new List<Torre>();
+            try
+            {
+                // Torre izquierda
+                var torreIzquierda = new Torre(150, 150, 0.2f)
+                {
+                    AjusteAngulo = 90f // Ajuste para que mire hacia la derecha inicialmente
+                };
+                torres.Add(torreIzquierda);
+
+                // Torre derecha
+                var torreDerecha = new Torre(this.ClientSize.Width - 250, 150, 0.2f)
+                {
+                    AjusteAngulo = 90f // Ajuste para que mire hacia la izquierda inicialmente
+                };
+                torres.Add(torreDerecha);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al cargar torres: {ex.Message}");
+            }
+
+            // Inicializar balas de torreta
+            balasTorreta = new List<Bala>();
+
+            // Inicializar nave jugador
             try
             {
                 naveJugador = new Naves(avionSeleccionado)
                 {
-                    PosX = this.ClientSize.Width / 2, // Posiciona la nave en el centro horizontal
-                    PosY = this.ClientSize.Height - (int)(100 * 0.2f), // Un poco por encima del borde inferior
-                    Escala = 0.5f // Escala de la nave en el juego
+                    PosX = this.ClientSize.Width / 2,
+                    PosY = this.ClientSize.Height - 200, // 200px desde abajo
+                    Escala = 0.5f
                 };
             }
-            catch (Exception ex) // Captura cualquier excepción durante la carga de la nave (FileNotFound, etc.)
+            catch (Exception ex)
             {
-                MessageBox.Show($"Error al cargar la nave '{avionSeleccionado}': {ex.Message}\nVerifica los archivos en 'Assets\\Naves\\{avionSeleccionado}'.", "Error de Carga", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error al cargar la nave: {ex.Message}");
                 naveJugador = null;
-                this.Close(); // Cierra la aplicación si la nave no puede ser cargada
+                this.Close();
                 return;
             }
 
-            listaObstaculos.Clear(); // Limpia los obstáculos existentes antes de añadir nuevos (si el juego se reiniciara)
+            // Limpiar y crear obstÃ¡culos
+            listaObstaculos.Clear();
+            listaObstaculos.Add(new Obstaculos(50, 50, 260, 260, Color.DarkSlateGray, Color.Black, 2.0f));
+            listaObstaculos.Add(new Obstaculos(350, 300, 260, 260, Color.Firebrick, Color.DarkRed, 3.0f));
+            listaObstaculos.Add(new Obstaculos(700, 50, 260, 260, Color.ForestGreen, Color.DarkGreen, 2.0f));
+            listaObstaculos.Add(new Obstaculos(10, 400, 260, 260, Color.Gold, Color.DarkGoldenrod, 1.0f));
 
-            // Obstáculos con dimensiones de 260px
-            // Las posiciones se ajustan para que quepan razonablemente en una ventana de 1080x720
-            listaObstaculos.Add(new Obstaculos(
-                x: 50, y: 50,
-                ancho: 260, alto: 260,
-                colorRelleno: Color.DarkSlateGray,
-                colorBorde: Color.Black,
-                grosorBorde: 2.0f
-            ));
-
-            listaObstaculos.Add(new Obstaculos(
-                x: 350, y: 300,
-                ancho: 260, alto: 260,
-                colorRelleno: Color.Firebrick,
-                colorBorde: Color.DarkRed,
-                grosorBorde: 3.0f
-            ));
-
-            listaObstaculos.Add(new Obstaculos(
-                x: 700, y: 50,
-                ancho: 260, alto: 260,
-                colorRelleno: Color.ForestGreen,
-                colorBorde: Color.DarkGreen,
-                grosorBorde: 2.0f
-            ));
-
-            listaObstaculos.Add(new Obstaculos(
-                x: 10, y: 400,
-                ancho: 260, alto: 260,
-                colorRelleno: Color.Gold,
-                colorBorde: Color.DarkGoldenrod,
-                grosorBorde: 1.0f
-            ));
-
-            // Asegura que el gestor de movimiento se inicialice y se inicie
+            // Iniciar sistema de movimiento
             if (naveJugador != null)
             {
-                if (gestorMovimiento == null)
-                {
-                    gestorMovimiento = new Movimiento(naveJugador, this);
-                }
+                gestorMovimiento = new Movimiento(naveJugador, this);
                 gestorMovimiento.IniciarMovimiento();
             }
-            else
+            // Configurar el temporizador para disparos de torretas
+            timerDisparoTorreta = new System.Windows.Forms.Timer();
+            timerDisparoTorreta.Interval = 1000; // Cada 1 segundo
+            timerDisparoTorreta.Tick += TimerDisparoTorreta_Tick;
+            timerDisparoTorreta.Start();
+            // Configurar el temporizador para actualizar las balas
+            timerActualizacionBalas = new System.Windows.Forms.Timer();
+            timerActualizacionBalas.Interval = 16; // â‰ˆ 60 FPS
+            timerActualizacionBalas.Tick += TimerActualizacionBalas_Tick;
+            timerActualizacionBalas.Start();
+
+
+        }
+        // Evento para manejar el disparo de torretas
+        private void TimerDisparoTorreta_Tick(object sender, EventArgs e)
+        {
+            if (torres == null || naveJugador == null) return;
+
+            foreach (var torre in torres)
             {
-                MessageBox.Show("No se pudo iniciar el movimiento: la nave no está disponible.", "Error Interno", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                // PosiciÃ³n desde el centro de la torre
+                float centroX = torre.PosX + (torre.bitmapCache?.Width ?? 0) / 2f;
+                float centroY = torre.PosY + (torre.bitmapCache?.Height ?? 0) / 2f;
+
+                var bala = new Bala(TipoBala.BalaTorreta, centroX, centroY, torre.AnguloRotacion);
+                balasTorreta.Add(bala);
             }
+
+            this.Invalidate(); // Redibujar
+        }
+        // Evento para actualizar las balas de torreta
+        private void TimerActualizacionBalas_Tick(object sender, EventArgs e)
+        {
+            // Actualizar balas de torreta
+            for (int i = balasTorreta.Count - 1; i >= 0; i--)
+            {
+                balasTorreta[i].Actualizar();
+                if (balasTorreta[i].EstaFueraDePantalla(this.ClientSize))
+                {
+                    balasTorreta.RemoveAt(i);
+                }
+            }
+
+            // Actualizar balas del jugador (si existen)
+            if (balasJugador != null)
+            {
+                for (int i = balasJugador.Count - 1; i >= 0; i--)
+                {
+                    balasJugador[i].Actualizar();
+                    if (balasJugador[i].EstaFueraDePantalla(this.ClientSize))
+                    {
+                        balasJugador.RemoveAt(i);
+                    }
+                }
+            }
+
+            // Verificar colisiones
+            VerificarColisiones();
+
+            this.Invalidate();
         }
 
-        // Manejador de evento para dibujar todos los elementos del juego (nave y obstáculos)
+
         private void DibujarElementosJuego(object sender, PaintEventArgs e)
         {
             var g = e.Graphics;
-            g.Clear(Color.White); // Limpia el fondo del formulario
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias; // Para un dibujo más suave
+            g.Clear(Color.White);
 
-            naveJugador?.Dibujar(g, naveJugador.Escala); // El operador '?.' (condicional nulo) evita errores si naveJugador es null
+            // ConfiguraciÃ³n Ã³ptima de renderizado
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighSpeed;
+            g.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighSpeed;
+            g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
 
-            foreach (var obstaculo in listaObstaculos)
+            // Dibujar torres primero
+            if (torres != null)
+            {
+                foreach (var torre in torres)
+                {
+                    // Solo calcular rotaciÃ³n si hay nave jugador
+                    if (naveJugador != null)
+                    {
+                        // Calcular Ã¡ngulo desde el centro de la torre al centro del aviÃ³n
+                        float centroTorreX = torre.PosX + (torre.bitmapCache?.Width ?? 0) / 2f;
+                        float centroTorreY = torre.PosY + (torre.bitmapCache?.Height ?? 0) / 2f;
+                        float centroAvionX = naveJugador.PosX;
+                        float centroAvionY = naveJugador.PosY;
+
+                        float dx = centroAvionX - centroTorreX;
+                        float dy = centroAvionY - centroTorreY;
+
+                        torre.AnguloRotacion = (float)(Math.Atan2(dy, dx) * (180 / Math.PI));
+                    }
+
+                    // Dibujar torre con rotaciÃ³n actual
+                    torre.Dibujar(g);
+
+                    // Dibujar punto de referencia para debug (opcional)
+                    using (var brush = new SolidBrush(Color.Red))
+                    {
+                        g.FillEllipse(brush, torre.PosX - 3, torre.PosY - 3, 6, 6);
+                    }
+                }
+            }
+
+            // Dibujar balas de torreta
+            if (balasTorreta != null)
+            {
+                foreach (var bala in balasTorreta)
+                {
+                    bala.Dibujar(g);
+                }
+            }
+
+            // Dibujar obstÃ¡culos
+            /*foreach (var obstaculo in listaObstaculos)
             {
                 obstaculo.Dibujar(g);
-            }
+            }*/
+            // Dibujar nave
+            naveJugador?.Dibujar(g, naveJugador.Escala);
         }
 
-        // Este método se llama cuando el formulario está a punto de cerrarse
+        // MÃ©todo para manejar el movimiento del jugador
+        private void VerificarColisiones()
+        {
+            // Verificar colisiones entre balas de torreta y jugador
+            for (int i = balasTorreta.Count - 1; i >= 0; i--)
+            {
+                if (naveJugador != null && balasTorreta[i].Bounds.IntersectsWith(naveJugador.Bounds))
+                {
+                    bool naveDestruida = naveJugador.RecibirDaÃ±o(10); // 10 de daÃ±o por bala
+                    balasTorreta.RemoveAt(i);
+
+                    if (naveDestruida)
+                    {
+                        // Game over
+                        MessageBox.Show("Â¡Nave destruida!");
+                        this.Close();
+                    }
+                }
+            }
+
+            // Verificar colisiones entre balas del jugador y torres
+            if (balasJugador != null)
+            {
+                for (int i = balasJugador.Count - 1; i >= 0; i--)
+                {
+                    for (int j = torres.Count - 1; j >= 0; j--)
+                    {
+                        if (balasJugador[i].Bounds.IntersectsWith(torres[j].Bounds))
+                        {
+                            bool torreDestruida = torres[j].RecibirDaÃ±o(20); // 20 de daÃ±o por bala
+                            balasJugador.RemoveAt(i);
+
+                            if (torreDestruida)
+                            {
+                                torres.RemoveAt(j);
+                            }
+                            break; // Salir del bucle de torres
+                        }
+                    }
+                }
+            }
+
+            // Verificar colisiÃ³n entre jugador y torres (sin daÃ±o segÃºn requerimiento)
+            if (naveJugador != null)
+            {
+                foreach (var torre in torres)
+                {
+                    if (naveJugador.Bounds.IntersectsWith(torre.Bounds))
+                    {
+                        // Solo empujar al jugador sin causar daÃ±o
+                        // Implementa lÃ³gica de empuje si lo deseas
+                    }
+                }
+            }
+        }
+        // MÃ©todo para manejar el movimiento del jugador
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             base.OnFormClosed(e);
-            gestorMovimiento?.DetenerMovimiento(); // Detiene el temporizador para liberar recursos
+            gestorMovimiento?.DetenerMovimiento();
         }
-
-        // El evento Form1_Load ya no es estrictamente necesario para iniciar el movimiento
-        // si lo manejamos en OnNaveSeleccionada. Puede dejarse si tienes otras inicializaciones
-        // que no dependen de la selección de la nave.
-        // private void Form1_Load(object sender, EventArgs e)
-        // {
-        // }
     }
 }

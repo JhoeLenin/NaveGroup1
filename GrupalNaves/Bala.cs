@@ -1,127 +1,151 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace GrupalNaves
 {
+    public enum TipoBala
+    {
+        BalaTorreta,
+        BalaAvion,
+        BalaEnemigo
+    }
 
-    public class Naves
+    public class Bala
     {
         private static string BasePath = Path.GetFullPath(
             Path.Combine(
-            Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.FullName,
-            "Assets",
-            "Naves"
+                Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.FullName,
+                "Assets", "Balas"
             )
         );
-        private readonly string rutaBordes;
-        private readonly string rutaColoreados;
 
         public float PosX { get; set; }
         public float PosY { get; set; }
-        public float Escala { get; set; } = 1.0f;
+        public float Velocidad { get; set; } = 10f;
         public float AnguloRotacion { get; set; } = 0f;
-        public TipoAvion Tipo { get; private set; }
+        public float Escala { get; set; } = 0.15f;
+        public TipoBala Tipo { get; private set; }
 
-        // Propiedades de las Naves
-        public int Vida { get; set; } = 100;
-        public RectangleF Bounds
-        {
-            get
-            {
-                // Ajusta estos valores según el tamaño real de tu nave
-                float width = 100 * Escala;
-                float height = 100 * Escala;
-                return new RectangleF(PosX - width / 2, PosY - height / 2, width, height);
-            }
-        }
-        // Propiedad para determinar si la nave está activa (no destruida)
-        public bool RecibirDaño(int cantidad)
-        {
-            Vida -= cantidad;
-            return Vida <= 0; // Devuelve true si la nave fue destruida
-        }
-
-        // Constructor que recibe el tipo de avión
-        public Naves(TipoAvion tipo)
-        {
-            Tipo = tipo;
-            string carpetaAvion = tipo.ToString();
-
-            rutaBordes = Path.Combine(BasePath, carpetaAvion, "bordes.txt");
-            rutaColoreados = Path.Combine(BasePath, carpetaAvion, "coloreados.txt");
-
-            // Validar que existan los archivos
-            if (!File.Exists(rutaBordes) || !File.Exists(rutaColoreados))
-            {
-                throw new FileNotFoundException($"Archivos no encontrados para el avión {tipo}");
-            }
-        }
-
-        public void Dibujar(Graphics g, float escala)
-        {
-            var coloreados = LeerColoreados(rutaColoreados);
-            var bordes = LeerBordes(rutaBordes);
-
-            // Usar un bitmap en caché para renderizado más rápido
-            if (bitmapCache == null || escala != lastEscala)
-            {
-                RegenerarCache(escala);
-                lastEscala = escala;
-            }
-
-            GraphicsState estadoOriginal = g.Save();
-            try
-            {
-                g.TranslateTransform(PosX, PosY);
-                g.RotateTransform(AnguloRotacion);
-                g.DrawImage(bitmapCache, -bitmapCache.Width / 2, -bitmapCache.Height / 2);
-            }
-            finally
-            {
-                g.Restore(estadoOriginal);
-            }
-        }
+        private const float AjusteAnguloInicial = 90f; // Grados para corregir orientación
 
         private Bitmap bitmapCache;
         private float lastEscala = -1;
 
-        private void RegenerarCache(float escala)
-        {
-            if (bitmapCache != null)
-                bitmapCache.Dispose();
+        private readonly string rutaBordes;
+        private readonly string rutaColoreados;
 
+        private float dx;
+        private float dy;
+
+        public bool Activa { get; set; } = true;
+
+        // Propiedades de la Bala
+        public RectangleF Bounds
+        {
+            get
+            {
+                float size = 10 * Escala; // Tamaño aproximado para detección de colisiones
+                return new RectangleF(PosX - size / 2, PosY - size / 2, size, size);
+            }
+        }
+
+        public Bala(TipoBala tipo, float x, float y, float? angulo = null, float escala = 0.15f)
+        {
+            Tipo = tipo;
+            PosX = x;
+            PosY = y;
+            Escala = escala;
+
+            string carpeta = tipo.ToString();
+            rutaBordes = Path.Combine(BasePath, carpeta, "bordes.txt");
+            rutaColoreados = Path.Combine(BasePath, carpeta, "coloreados.txt");
+
+            if (!File.Exists(rutaBordes) || !File.Exists(rutaColoreados))
+                throw new FileNotFoundException($"No se encontraron archivos para {tipo}");
+
+            if (tipo == TipoBala.BalaTorreta && angulo.HasValue)
+            {
+                // Movimiento hacia el ángulo dado
+                AnguloRotacion = angulo.Value + AjusteAnguloInicial;
+                float radians = (float)(Math.PI / 180 * angulo.Value);
+                dx = (float)Math.Cos(radians);
+                dy = (float)Math.Sin(radians);
+            }
+            else if (tipo == TipoBala.BalaAvion)
+            {
+                dx = 0f;
+                dy = -1f; // Hacia arriba
+            }
+            else if (tipo == TipoBala.BalaEnemigo)
+            {
+                dx = 0f;
+                dy = 1f; // Hacia abajo
+            }
+        }
+
+        public void Actualizar()
+        {
+            PosX += dx * Velocidad;
+            PosY += dy * Velocidad;
+        }
+
+        public void Dibujar(Graphics g)
+        {
+            if (bitmapCache == null || Escala != lastEscala)
+            {
+                RegenerarCache();
+                lastEscala = Escala;
+            }
+
+            GraphicsState estado = g.Save();
+            try
+            {
+                g.TranslateTransform(PosX, PosY);
+                if (Tipo == TipoBala.BalaTorreta)
+                {
+                    g.RotateTransform(AnguloRotacion); // Apunta hacia el jugador
+                }
+                g.DrawImage(bitmapCache, -bitmapCache.Width / 2, -bitmapCache.Height / 2);
+            }
+            finally
+            {
+                g.Restore(estado);
+            }
+        }
+
+        private void RegenerarCache()
+        {
             var coloreados = LeerColoreados(rutaColoreados);
             var bordes = LeerBordes(rutaBordes);
 
-            // Calcular tamaño necesario
-            int maxX = coloreados.Max(c => c.puntos.Max(p => p.X));
-            int maxY = coloreados.Max(c => c.puntos.Max(p => p.Y));
-            int width = (int)(maxX * escala) + 10;
-            int height = (int)(maxY * escala) + 10;
+            int maxX = coloreados.Max(c => c.puntos.Max(p => p.X)) + 5;
+            int maxY = coloreados.Max(c => c.puntos.Max(p => p.Y)) + 5;
+            int width = (int)(maxX * Escala);
+            int height = (int)(maxY * Escala);
 
+            bitmapCache?.Dispose();
             bitmapCache = new Bitmap(width, height);
+
             using (var g = Graphics.FromImage(bitmapCache))
             {
                 g.Clear(Color.Transparent);
-                g.ScaleTransform(escala, escala);
+                g.ScaleTransform(Escala, Escala);
 
-                // Dibujar coloreados optimizado
                 foreach (var (color, puntos) in coloreados)
                 {
-                    using (SolidBrush brush = new SolidBrush(color))
+                    using (var b = new SolidBrush(color))
                     {
                         foreach (var p in puntos)
                         {
-                            g.FillRectangle(brush, p.X, p.Y, 2, 2);
+                            g.FillRectangle(b, p.X, p.Y, 2, 2);
                         }
                     }
                 }
 
-                // Dibujar bordes optimizado
                 foreach (var grupo in bordes)
                 {
                     if (grupo.Count > 1)
@@ -175,5 +199,17 @@ namespace GrupalNaves
             }
             return grupos;
         }
+
+        public RectangleF ObtenerRect()
+        {
+            return new RectangleF(PosX - 5, PosY - 5, 10, 10);
+        }
+        public bool EstaFueraDePantalla(Size tamañoPantalla)
+        {
+            return PosX < -50 || PosX > tamañoPantalla.Width + 50 ||
+                   PosY < -50 || PosY > tamañoPantalla.Height + 50;
+        }
+
     }
+
 }
