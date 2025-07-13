@@ -21,7 +21,9 @@ namespace GrupalNaves
         private System.Windows.Forms.Timer timerActualizacionBalas;
 
         private List<Bala> balasJugador;
-        private List<Bala> balasTorretas;
+        // Bitmap de fondo (opcional, si se desea un fondo estático)
+        private FondoJuego fondoJuego;
+
 
 
         public Form1()
@@ -29,14 +31,29 @@ namespace GrupalNaves
             InitializeComponent();
             Debug.WriteLine($"Tamaño real del cliente: {this.ClientSize}");
 
+            
             // Configuración de la ventana
             this.DoubleBuffered = true;
             this.ClientSize = new Size(1920, 1080);
             this.Text = "Juego de Naves Espaciales";
             this.KeyPreview = true;
+            this.Resize += Form1_Resize; // Nuevo evento para redimensionamiento
+
+            // Cargar fondo usando la nueva clase
+            try
+            {
+                fondoJuego = FondoJuego.CrearDesdeAssets("fondo.png", this.ClientSize);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error al cargar el fondo: {ex.Message}");
+                fondoJuego = null;
+            }
+
 
             // Inicializar componentes
             listaObstaculos = new List<Obstaculos>();
+            balasJugador = new List<Bala>();
 
             // Eventos
             this.Paint += DibujarElementosJuego;
@@ -49,9 +66,34 @@ namespace GrupalNaves
             menuSeleccion.MostrarMenu();
         }
 
+        private void Form1_Resize(object sender, EventArgs e)
+        {
+            fondoJuego?.CambiarTamaño(this.ClientSize);
+            this.Invalidate(); // Redibujar
+        }
+
         private void Form1_DebugKeyDown(object sender, KeyEventArgs e)
         {
             Debug.WriteLine($"Tecla presionada: {e.KeyCode}");
+            // Disparar con barra espaciadora
+            if (e.KeyCode == Keys.Space && naveJugador != null)
+            {
+                if (balasJugador == null)
+                {
+                    balasJugador = new List<Bala>();
+                    Debug.WriteLine("Lista de balas del jugador inicializada");
+                }
+
+                float centroX = naveJugador.PosX;
+                float centroY = naveJugador.PosY - (50 * naveJugador.Escala);
+
+                Debug.WriteLine($"Creando bala en ({centroX}, {centroY})");
+
+                var bala = new Bala(TipoBala.BalaAvion, centroX, centroY);
+                balasJugador.Add(bala);
+
+                Debug.WriteLine($"Balas del jugador: {balasJugador.Count}");
+            }
         }
 
         private void Form1_DebugKeyUp(object sender, KeyEventArgs e)
@@ -136,12 +178,32 @@ namespace GrupalNaves
             timerDisparoTorreta.Start();
             // Configurar el temporizador para actualizar las balas
             timerActualizacionBalas = new System.Windows.Forms.Timer();
-            timerActualizacionBalas.Interval = 16; // ≈ 60 FPS
+            timerActualizacionBalas.Interval = 33; // ≈ 60 FPS
             timerActualizacionBalas.Tick += TimerActualizacionBalas_Tick;
             timerActualizacionBalas.Start();
 
 
         }
+        // Evento para manejar el disparo del jugador
+        private void Form1_KeyDown(object sender, KeyEventArgs e)
+        {
+            Debug.WriteLine($"Tecla presionada: {e.KeyCode}");
+
+            // Disparar con barra espaciadora
+            if (e.KeyCode == Keys.Space && naveJugador != null)
+            {
+                if (balasJugador == null)
+                    balasJugador = new List<Bala>();
+
+                // Crear bala desde el centro de la nave jugador
+                float centroX = naveJugador.PosX;
+                float centroY = naveJugador.PosY - (50 * naveJugador.Escala); // Disparar desde el frente
+
+                var bala = new Bala(TipoBala.BalaAvion, centroX, centroY);
+                balasJugador.Add(bala);
+            }
+        }
+
         // Evento para manejar el disparo de torretas
         private void TimerDisparoTorreta_Tick(object sender, EventArgs e)
         {
@@ -197,6 +259,9 @@ namespace GrupalNaves
             var g = e.Graphics;
             g.Clear(Color.White);
 
+            // Dibujar fondo del juego
+            fondoJuego?.Dibujar(g);
+
             // Configuración óptima de renderizado
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighSpeed;
             g.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighSpeed;
@@ -241,7 +306,14 @@ namespace GrupalNaves
                     bala.Dibujar(g);
                 }
             }
-
+            // Dibujar balas del jugador
+            if (balasJugador != null)
+            {
+                foreach (var bala in balasJugador)
+                {
+                    bala.Dibujar(g);
+                }
+            }
             // Dibujar obstáculos
             /*foreach (var obstaculo in listaObstaculos)
             {
@@ -249,6 +321,16 @@ namespace GrupalNaves
             }*/
             // Dibujar nave
             naveJugador?.Dibujar(g, naveJugador.Escala);
+
+            // Dibujar HUD (opcional)
+            if (naveJugador != null)
+            {
+                using (var font = new Font("Arial", 16))
+                using (var brush = new SolidBrush(Color.Black))
+                {
+                    g.DrawString($"Vida: {naveJugador.Vida}", font, brush, 20, 20);
+                }
+            }
         }
 
         // Método para manejar el movimiento del jugador
@@ -293,7 +375,7 @@ namespace GrupalNaves
                 }
             }
 
-            // Verificar colisión entre jugador y torres (sin daño según requerimiento)
+            // Verificar colisión entre jugador y torres (sin daño)
             if (naveJugador != null)
             {
                 foreach (var torre in torres)
@@ -310,6 +392,9 @@ namespace GrupalNaves
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             base.OnFormClosed(e);
+
+            // Liberar recursos
+            fondoJuego?.Dispose();
             gestorMovimiento?.DetenerMovimiento();
         }
     }

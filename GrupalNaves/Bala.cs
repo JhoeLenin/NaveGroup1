@@ -92,7 +92,7 @@ namespace GrupalNaves
             PosX += dx * Velocidad;
             PosY += dy * Velocidad;
         }
-
+        // Método para regenerar el bitmap cacheado
         public void Dibujar(Graphics g)
         {
             if (bitmapCache == null || Escala != lastEscala)
@@ -116,7 +116,7 @@ namespace GrupalNaves
                 g.Restore(estado);
             }
         }
-
+        // Método para regenerar el bitmap cacheado
         private void RegenerarCache()
         {
             var coloreados = LeerColoreados(rutaColoreados);
@@ -156,6 +156,7 @@ namespace GrupalNaves
             }
         }
 
+        // Método para leer los grupos coloreados desde un archivo
         private List<(Color color, List<Point> puntos)> LeerColoreados(string ruta)
         {
             var grupos = new List<(Color, List<Point>)>();
@@ -182,7 +183,7 @@ namespace GrupalNaves
             }
             return grupos;
         }
-
+        // Método para leer los bordes desde un archivo
         private List<List<Point>> LeerBordes(string ruta)
         {
             var grupos = new List<List<Point>>();
@@ -206,8 +207,8 @@ namespace GrupalNaves
         }
         public bool EstaFueraDePantalla(Size tamañoPantalla)
         {
-            return PosX < -50 || PosX > tamañoPantalla.Width + 50 ||
-                   PosY < -50 || PosY > tamañoPantalla.Height + 50;
+            return PosX < -100 || PosX > tamañoPantalla.Width + 100 ||
+                   PosY < -100 || PosY > tamañoPantalla.Height + 100;
         }
 
     }
