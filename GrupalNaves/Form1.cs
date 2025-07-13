@@ -31,7 +31,7 @@ namespace GrupalNaves
             InitializeComponent();
             Debug.WriteLine($"Tamaño real del cliente: {this.ClientSize}");
 
-            
+
             // Configuración de la ventana
             this.DoubleBuffered = true;
             this.ClientSize = new Size(1920, 1080);
@@ -325,8 +325,8 @@ namespace GrupalNaves
             // Dibujar HUD (opcional)
             if (naveJugador != null)
             {
-                using (var font = new Font("Arial", 16))
-                using (var brush = new SolidBrush(Color.Black))
+                using (var font = new Font("Arial", 16, FontStyle.Bold))
+                using (var brush = new SolidBrush(Color.Red))
                 {
                     g.DrawString($"Vida: {naveJugador.Vida}", font, brush, 20, 20);
                 }

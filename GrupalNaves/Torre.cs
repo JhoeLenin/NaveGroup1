@@ -14,7 +14,7 @@ namespace GrupalNaves
                 Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.FullName,
                 "Assets",
                 "Torres",
-                "TORRE1000.2.75"
+                "Torreta"
             )
         );
 

@@ -1,44 +1,70 @@
 ﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
-using System.IO; // Necesario para FileNotFoundException en ActualizarPreviewNave
+using System.IO;
 
 namespace GrupalNaves
 {
-
     public class Menu
     {
-        // Evento que se disparará cuando el usuario seleccione una nave y haga clic en "Escoger nave"
-        // Form1 se suscribirá a este evento para saber qué nave se eligió.
         public event Action<TipoAvion> NaveSeleccionada;
 
         public void MostrarMenu()
         {
-            using (var menuForm = new Form()) // Cambiado a menuForm para evitar confusión con la clase Menu
+            using (var menuForm = new Form())
             {
-                menuForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                // **Configuración básica del formulario**
+                menuForm.FormBorderStyle = FormBorderStyle.FixedSingle;
                 menuForm.StartPosition = FormStartPosition.CenterScreen;
-                menuForm.Text = "Selecciona tu nave";
-                menuForm.Width = 400;
-                menuForm.Height = 350;
-                menuForm.MaximizeBox = false; // Evitar maximizar el menú
-                menuForm.MinimizeBox = false; // Evitar minimizar el menú
-                menuForm.ShowInTaskbar = false; // No mostrar el menú en la barra de tareas
+                menuForm.Text = "¡Prepara tu nave para la batalla!";
+                menuForm.Width = 450;
+                menuForm.Height = 500;
+                menuForm.MaximizeBox = false;
+                menuForm.MinimizeBox = false;
+                menuForm.ShowInTaskbar = false;
+                menuForm.BackColor = Color.FromArgb(28, 28, 28);
+                menuForm.Padding = new Padding(10);
 
-                var label = new Label()
+                // **Etiqueta de título mejorada**
+                var titleLabel = new Label()
                 {
-                    Text = "Elige tu nave:",
-                    Left = 50,
-                    Top = 20,
-                    Width = 200
+                    Text = "¡SELECCIONA TU NAVE!",
+                    Font = new Font("Arial", 18, FontStyle.Bold),
+                    ForeColor = Color.Gold,
+                    AutoSize = true,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    Dock = DockStyle.Top,
+                    Padding = new Padding(0, 10, 0, 15)
                 };
 
+                // **Panel para agrupar los controles de selección**
+                var selectionPanel = new Panel()
+                {
+                    Dock = DockStyle.Fill,
+                    Padding = new Padding(10), // Padding interno para los controles
+                    BackColor = Color.Transparent
+                };
+
+                // **Etiqueta para el ComboBox**
+                var label = new Label()
+                {
+                    Text = "Elige tu nave espacial:",
+                    Width = 250, // Se ajustará con AutoSize, pero lo mantenemos para referencia
+                    ForeColor = Color.Orange, // Cambiado a Blanco puro para asegurar contraste
+                    Font = new Font("Arial", 12, FontStyle.Bold),
+                    AutoSize = true // Importante para que el Label tome el tamaño de su texto
+                };
+
+                // **ComboBox mejorado**
                 var comboBox = new ComboBox()
                 {
-                    Left = 50,
-                    Top = 50,
-                    Width = 200,
-                    DropDownStyle = ComboBoxStyle.DropDownList
+                    Width = 250,
+                    // Height = 100, // Esta altura es para el ComboBox en sí, no para la lista desplegable. 
+                    // Un valor estándar es suficiente, o simplemente no la fijes.
+                    DropDownStyle = ComboBoxStyle.DropDownList,
+                    BackColor = Color.FromArgb(50, 50, 50),
+                    ForeColor = Color.White,
+                    Font = new Font("Aptos", 11, FontStyle.Regular)
                 };
 
                 foreach (TipoAvion tipo in Enum.GetValues(typeof(TipoAvion)))
@@ -47,15 +73,14 @@ namespace GrupalNaves
                 }
                 comboBox.SelectedIndex = 0;
 
+                // **PictureBox para la previsualización**
                 var pictureBoxPreview = new PictureBox()
                 {
-                    Left = 100,
-                    Top = 100,
-                    Width = 150,
-                    Height = 150,
-                    BorderStyle = BorderStyle.FixedSingle,
+                    Width = 250,
+                    Height = 180,
+                    BorderStyle = BorderStyle.Fixed3D,
                     SizeMode = PictureBoxSizeMode.Zoom,
-                    BackColor = Color.White
+                    BackColor = Color.FromArgb(40, 40, 40)
                 };
 
                 comboBox.SelectedIndexChanged += (s, e) =>
@@ -64,46 +89,93 @@ namespace GrupalNaves
                     ActualizarPreviewNave(pictureBoxPreview, tipoSeleccionadoEnCombo);
                 };
 
-                var botonAceptar = new Button()
+                // **Botón de acción mejorado**
+                var selectButton = new Button()
                 {
-                    Text = "Escoger nave",
-                    Left = 50,
-                    Top = 270,
-                    Width = 200,
-                    Height = 30
+                    Text = "¡ESCOGER ESTA NAVE!",
+                    Width = 250,
+                    Height = 45,
+                    BackColor = Color.LimeGreen,
+                    ForeColor = Color.White,
+                    Font = new Font("Arial", 12, FontStyle.Bold),
+                    FlatStyle = FlatStyle.Flat,
+                    Cursor = Cursors.Hand
                 };
+                selectButton.FlatAppearance.BorderSize = 0;
 
-                botonAceptar.Click += (s, e) =>
+                // Variable para saber si se hizo clic en el botón de selección
+                bool naveSeleccionadaPorBoton = false;
+
+                selectButton.Click += (s, e) =>
                 {
                     TipoAvion seleccionFinal = (TipoAvion)comboBox.SelectedIndex;
-                    // Dispara el evento NaveSeleccionada para que Form1 lo reciba
                     NaveSeleccionada?.Invoke(seleccionFinal);
-                    menuForm.Close(); // Cierra el formulario del menú
+                    naveSeleccionadaPorBoton = true; // Se marcó que se seleccionó por el botón
+                    menuForm.Close();
                 };
 
-                menuForm.Controls.Add(label);
-                menuForm.Controls.Add(comboBox);
-                menuForm.Controls.Add(pictureBoxPreview);
-                menuForm.Controls.Add(botonAceptar);
+                // Evento FormClosing para controlar el cierre
+                menuForm.FormClosing += (s, e) =>
+                {
+                    // Si la nave NO fue seleccionada por el botón, cancela el cierre de la aplicación.
+                    // Esto evita que Form1 se abra si se cierra la ventana manualmente.
+                    if (!naveSeleccionadaPorBoton)
+                    {
+                        // Si quieres que el programa completo se cierre si el usuario cierra el menú
+                        // sin seleccionar una nave, puedes usar Application.Exit();
+                        Application.Exit();
+                        // O si solo quieres cancelar el cierre de este menú y que el usuario decida:
+                        // e.Cancel = true; 
+                        // MessageBox.Show("Debes escoger una nave para continuar o cerrar la aplicación.", "Aviso", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                };
 
-                // Actualiza la previsualización inicial
+
+                // **Agregar controles al panel de selección en un orden lógico**
+                selectionPanel.Controls.Add(label);
+                selectionPanel.Controls.Add(comboBox);
+                selectionPanel.Controls.Add(pictureBoxPreview);
+                selectionPanel.Controls.Add(selectButton);
+
+                // **Agregar el título y el panel de selección al formulario**
+                menuForm.Controls.Add(titleLabel);
+                menuForm.Controls.Add(selectionPanel);
+
+                // **Posicionamiento central de los controles dentro del panel**
+                menuForm.Load += (s, e) =>
+                {
+                    int controlWidth = 250; // Ancho consistente para los controles
+                    int panelCenterX = (selectionPanel.Width - controlWidth) / 2;
+
+                    // Posicionamiento vertical dentro del panel
+                    label.Left = panelCenterX;
+                    label.Top = label.Bottom + 35; // Inicio en la parte superior del panel
+
+                    comboBox.Left = panelCenterX;
+                    comboBox.Top = label.Bottom + 25; // Ajuste para un buen espaciado
+
+                    pictureBoxPreview.Left = panelCenterX;
+                    pictureBoxPreview.Top = comboBox.Bottom + 20;
+
+                    selectButton.Left = panelCenterX;
+                    selectButton.Top = pictureBoxPreview.Bottom + 25;
+                };
+
                 ActualizarPreviewNave(pictureBoxPreview, (TipoAvion)comboBox.SelectedIndex);
 
-                // Muestra el menú como un diálogo modal
                 menuForm.ShowDialog();
             }
         }
 
-        // Método para actualizar la vista previa de la nave (copiado de Form1, requiere Naves.cs)
         private void ActualizarPreviewNave(PictureBox pb, TipoAvion tipo)
         {
             try
             {
                 Naves navePreview = new Naves(tipo)
                 {
-                    PosX = 0,
-                    PosY = 0,
-                    Escala = 0.35f
+                    PosX = pb.Width / 2,
+                    PosY = pb.Height / 2,
+                    Escala = 0.5f // Ajustar la escala para que se vea mejor
                 };
 
                 Bitmap bmp = new Bitmap(pb.Width, pb.Height);
@@ -111,7 +183,25 @@ namespace GrupalNaves
                 {
                     g.Clear(pb.BackColor);
                     g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-                    navePreview.Dibujar(g, navePreview.Escala);
+
+                    // Asegúrate de que tu método Dibujar en la clase Naves 
+                    // toma el tercer y cuarto parámetro (drawX, drawY) o se ajusta a PosX, PosY.
+                    // Si tu clase Naves tiene AnchoBase y AltoBase (recomendado):
+                    // int scaledWidth = (int)(navePreview.AnchoBase * navePreview.Escala);
+                    // int scaledHeight = (int)(navePreview.AltoBase * navePreview.Escala);
+                    // int drawX = (pb.Width - scaledWidth) / 2;
+                    // int drawY = (pb.Height - scaledHeight) / 2;
+                    // navePreview.Dibujar(g, navePreview.Escala, drawX, drawY);
+
+                    // Si no tienes AnchoBase/AltoBase y tu método Dibujar espera solo Graphics y Escala,
+                    // y usa PosX/PosY internamente:
+                    navePreview.Dibujar(g, navePreview.Escala); // Usará navePreview.PosX y navePreview.PosY
+
+                    // Si tu método Dibujar espera solo Graphics, Escala, y no usa PosX/PosY de la clase:
+                    // int estimatedBaseSize = 100; // Ajusta este valor si tus naves son más grandes/pequeñas
+                    // int drawX = (int)((pb.Width / 2) - (navePreview.Escala * estimatedBaseSize / 2));
+                    // int drawY = (int)((pb.Height / 2) - (navePreview.Escala * estimatedBaseSize / 2));
+                    // navePreview.Dibujar(g, navePreview.Escala, drawX, drawY); // Si tu Dibujar tiene (Graphics, float, int, int)
                 }
                 pb.Image = bmp;
             }
