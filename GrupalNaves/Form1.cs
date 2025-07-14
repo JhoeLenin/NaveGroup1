@@ -72,26 +72,33 @@ namespace GrupalNaves
             this.Invalidate(); // Redibujar
         }
 
+        // Método que se ejecuta cuando se presiona una tecla mientras el formulario tiene el foco
         private void Form1_DebugKeyDown(object sender, KeyEventArgs e)
         {
+            // Imprime en la consola de depuración qué tecla fue presionada
             Debug.WriteLine($"Tecla presionada: {e.KeyCode}");
-            // Disparar con barra espaciadora
+            // Verifica si la tecla presionada es la barra espaciadora y si la nave del jugador existe
             if (e.KeyCode == Keys.Space && naveJugador != null)
             {
+                // Si la lista de balas del jugador aún no fue creada, la inicializa
                 if (balasJugador == null)
                 {
                     balasJugador = new List<Bala>();
                     Debug.WriteLine("Lista de balas del jugador inicializada");
                 }
 
+                // Calcula la posición inicial de la bala: centrada en la nave y un poco más arriba (para simular que sale del frente)
                 float centroX = naveJugador.PosX;
                 float centroY = naveJugador.PosY - (50 * naveJugador.Escala);
 
                 Debug.WriteLine($"Creando bala en ({centroX}, {centroY})");
 
+                // Crea una nueva bala de tipo 'BalaAvion' en la posición calculada
                 var bala = new Bala(TipoBala.BalaAvion, centroX, centroY);
+                // Agrega la nueva bala a la lista de balas activas del jugador
                 balasJugador.Add(bala);
 
+                // Imprime en la consola de depuración cuántas balas hay en la lista actualmente
                 Debug.WriteLine($"Balas del jugador: {balasJugador.Count}");
             }
         }
@@ -204,7 +211,7 @@ namespace GrupalNaves
             }
         }
 
-        // Evento para manejar el disparo de torretas
+        // Evento para manejar el disparo de las torretas
         private void TimerDisparoTorreta_Tick(object sender, EventArgs e)
         {
             if (torres == null || naveJugador == null) return;

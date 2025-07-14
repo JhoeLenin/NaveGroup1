@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.IO;
-using System.Linq;
+using System.Drawing;// Proporciona clases para trabajar con gráficos 2D
+using System.Drawing.Drawing2D; // Proporciona funciones más avanzadas para gráficos
+using System.IO;// Permite manipular archivos y flujos de datos
+using System.Linq;// Permite realizar consultas sobre colecciones
 
 namespace GrupalNaves
 {
+    // Enum que define los tipos de balas que puede haber en el juego
     public enum TipoBala
     {
         BalaTorreta,
@@ -16,6 +17,7 @@ namespace GrupalNaves
 
     public class Bala
     {
+        // Ruta base donde están las imágenes de las balas (Assets/Balas)
         private static string BasePath = Path.GetFullPath(
             Path.Combine(
                 Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.FullName,
@@ -23,27 +25,36 @@ namespace GrupalNaves
             )
         );
 
+        // Posición en X de la bala (centro)
         public float PosX { get; set; }
+        // Posición en Y de la bala (centro)
         public float PosY { get; set; }
+        // Velocidad de desplazamiento por cuadro (frame)
         public float Velocidad { get; set; } = 10f;
+        // Ángulo de rotación de la imagen, útil para disparos rotados (e.g., torretas)
         public float AnguloRotacion { get; set; } = 0f;
+        // Escala del tamaño de la imagen de la bala
         public float Escala { get; set; } = 0.15f;
+        // Tipo de bala (Avión, Torreta, Enemigo)
         public TipoBala Tipo { get; private set; }
 
-        private const float AjusteAnguloInicial = 90f; // Grados para corregir orientación
-
+        // Constante usada para ajustar la orientación gráfica inicial de las balas
+        private const float AjusteAnguloInicial = 90f;
+        // Imagen renderizada de la bala
         private Bitmap bitmapCache;
         private float lastEscala = -1;
 
+        // Rutas a los archivos de bordes y color de la bala, para construir su apariencia
         private readonly string rutaBordes;
         private readonly string rutaColoreados;
 
+        // Direcciones de movimiento en el eje X e Y
         private float dx;
         private float dy;
 
         public bool Activa { get; set; } = true;
 
-        // Propiedades de la Bala
+        // Rectángulo que representa el área de colisión de la bala
         public RectangleF Bounds
         {
             get
@@ -60,13 +71,17 @@ namespace GrupalNaves
             PosY = y;
             Escala = escala;
 
+            // Carpeta correspondiente al tipo de bala
             string carpeta = tipo.ToString();
+            // Define las rutas a los archivos que contienen los datos visuales de la bala
             rutaBordes = Path.Combine(BasePath, carpeta, "bordes.txt");
             rutaColoreados = Path.Combine(BasePath, carpeta, "coloreados.txt");
 
+            // Verifica que ambos archivos existan; si no, lanza una excepción
             if (!File.Exists(rutaBordes) || !File.Exists(rutaColoreados))
                 throw new FileNotFoundException($"No se encontraron archivos para {tipo}");
 
+            // Si es una bala de torreta, puede tener un ángulo personalizado
             if (tipo == TipoBala.BalaTorreta && angulo.HasValue)
             {
                 // Movimiento hacia el ángulo dado
@@ -183,6 +198,7 @@ namespace GrupalNaves
             }
             return grupos;
         }
+        //MAU!
         // Método para leer los bordes desde un archivo
         private List<List<Point>> LeerBordes(string ruta)
         {
