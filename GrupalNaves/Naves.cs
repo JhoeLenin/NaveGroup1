@@ -4,6 +4,7 @@ using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 
 namespace GrupalNaves
 {
@@ -17,6 +18,8 @@ namespace GrupalNaves
             "Naves"
             )
         );
+
+        private readonly Form1 formulario; // Referencia al formulario
         private readonly string rutaBordes;
         private readonly string rutaColoreados;
 
@@ -46,8 +49,9 @@ namespace GrupalNaves
         }
 
         // Constructor que recibe el tipo de avión
-        public Naves(TipoAvion tipo)
+        public Naves(TipoAvion tipo, Form1 form)
         {
+            this.formulario = form;
             Tipo = tipo;
             string carpetaAvion = tipo.ToString();
 
@@ -59,6 +63,8 @@ namespace GrupalNaves
             {
                 throw new FileNotFoundException($"Archivos no encontrados para el avión {tipo}");
             }
+
+            this.formulario = formulario;
         }
 
         public void Dibujar(Graphics g, float escala)
@@ -66,7 +72,6 @@ namespace GrupalNaves
             var coloreados = LeerColoreados(rutaColoreados);
             var bordes = LeerBordes(rutaBordes);
 
-            // Usar un bitmap en caché para renderizado más rápido
             if (bitmapCache == null || escala != lastEscala)
             {
                 RegenerarCache(escala);
@@ -76,6 +81,12 @@ namespace GrupalNaves
             GraphicsState estadoOriginal = g.Save();
             try
             {
+                // Calcular ángulo hacia el cursor
+                Point cursorPos = Form1.Instance.PointToClient(Cursor.Position);
+                float dx = cursorPos.X - PosX;
+                float dy = cursorPos.Y - PosY;
+                AnguloRotacion = (float)(Math.Atan2(dy, dx) * (180 / Math.PI)) + 90; // +90 para ajuste
+
                 g.TranslateTransform(PosX, PosY);
                 g.RotateTransform(AnguloRotacion);
                 g.DrawImage(bitmapCache, -bitmapCache.Width / 2, -bitmapCache.Height / 2);

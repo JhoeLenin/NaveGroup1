@@ -1,13 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;// Proporciona clases para trabajar con gráficos 2D
-using System.Drawing.Drawing2D; // Proporciona funciones más avanzadas para gráficos
-using System.IO;// Permite manipular archivos y flujos de datos
-using System.Linq;// Permite realizar consultas sobre colecciones
+using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.IO;
+using System.Linq;
+using System.Reflection;
 
 namespace GrupalNaves
 {
-    // Enum que define los tipos de balas que puede haber en el juego
     public enum TipoBala
     {
         BalaTorreta,
@@ -17,88 +18,180 @@ namespace GrupalNaves
 
     public class Bala
     {
-        // Ruta base donde están las imágenes de las balas (Assets/Balas)
-        private static string BasePath = Path.GetFullPath(
-            Path.Combine(
-                Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.FullName,
-                "Assets", "Balas"
-            )
-        );
+        // Ruta base mejorada que funciona en cualquier entorno
+        private static string BasePath = GetAssetsPath();
+        // Cache global para evitar recargar imágenes repetidamente
+        private static Dictionary<TipoBala, Bitmap> cacheGlobal = new Dictionary<TipoBala, Bitmap>();
 
-        // Posición en X de la bala (centro)
+        // Método para obtener la ruta correcta a los assets
+        private static string GetAssetsPath()
+        {
+            try
+            {
+                // Primero intentamos con la ruta de desarrollo (tu ruta local)
+                string devPath = Path.Combine(
+                    Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location),
+                    "..", "..", "..", "Assets", "Balas");
+
+                if (Directory.Exists(devPath))
+                    return devPath;
+
+                // Si no existe, probamos con la ruta de ejecución (bin/Debug)
+                string execPath = Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory, "Assets", "Balas");
+
+                if (Directory.Exists(execPath))
+                    return execPath;
+
+                // Si no existe, probamos con la ruta de publicación (bin/Release)
+                string releasePath = Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory, "..", "Assets", "Balas");
+
+                if (Directory.Exists(releasePath))
+                    return releasePath;
+
+                // Último recurso: ruta absoluta (solo para debug)
+                string absolutePath = @"C:\Users\PC\source\repos\NaveGroup1\GrupalNaves\Assets\Balas";
+                if (Directory.Exists(absolutePath))
+                {
+                    Debug.WriteLine("ADVERTENCIA: Usando ruta absoluta - solo para desarrollo");
+                    return absolutePath;
+                }
+
+                throw new DirectoryNotFoundException("No se pudo encontrar el directorio de assets");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error al determinar ruta de assets: {ex.Message}");
+                throw;
+            }
+        }
+
+        // Resto de la clase Bala (igual que antes)
         public float PosX { get; set; }
-        // Posición en Y de la bala (centro)
         public float PosY { get; set; }
-        // Velocidad de desplazamiento por cuadro (frame)
         public float Velocidad { get; set; } = 10f;
-        // Ángulo de rotación de la imagen, útil para disparos rotados (e.g., torretas)
         public float AnguloRotacion { get; set; } = 0f;
-        // Escala del tamaño de la imagen de la bala
         public float Escala { get; set; } = 0.15f;
-        // Tipo de bala (Avión, Torreta, Enemigo)
         public TipoBala Tipo { get; private set; }
+        public bool Activa { get; set; } = true;
 
-        // Constante usada para ajustar la orientación gráfica inicial de las balas
-        private const float AjusteAnguloInicial = 90f;
-        // Imagen renderizada de la bala
         private Bitmap bitmapCache;
         private float lastEscala = -1;
-
-        // Rutas a los archivos de bordes y color de la bala, para construir su apariencia
         private readonly string rutaBordes;
         private readonly string rutaColoreados;
-
-        // Direcciones de movimiento en el eje X e Y
         private float dx;
         private float dy;
 
-        public bool Activa { get; set; } = true;
-
-        // Rectángulo que representa el área de colisión de la bala
         public RectangleF Bounds
         {
             get
             {
-                float size = 10 * Escala; // Tamaño aproximado para detección de colisiones
+                float size = 10 * Escala;
                 return new RectangleF(PosX - size / 2, PosY - size / 2, size, size);
             }
         }
 
-        public Bala(TipoBala tipo, float x, float y, float? angulo = null, float escala = 0.15f)
+        public Bala(TipoBala tipo, float x, float y, float? angulo = null, float escala = 0.15f, PointF? cursorPos = null)
         {
             Tipo = tipo;
             PosX = x;
             PosY = y;
             Escala = escala;
 
-            // Carpeta correspondiente al tipo de bala
+            // Configuración de rutas con verificación mejorada
             string carpeta = tipo.ToString();
-            // Define las rutas a los archivos que contienen los datos visuales de la bala
             rutaBordes = Path.Combine(BasePath, carpeta, "bordes.txt");
             rutaColoreados = Path.Combine(BasePath, carpeta, "coloreados.txt");
 
-            // Verifica que ambos archivos existan; si no, lanza una excepción
-            if (!File.Exists(rutaBordes) || !File.Exists(rutaColoreados))
-                throw new FileNotFoundException($"No se encontraron archivos para {tipo}");
+            Debug.WriteLine($"Intentando cargar balas desde: {BasePath}");
+            Debug.WriteLine($"Ruta bordes: {rutaBordes}");
+            Debug.WriteLine($"Ruta colores: {rutaColoreados}");
 
-            // Si es una bala de torreta, puede tener un ángulo personalizado
-            if (tipo == TipoBala.BalaTorreta && angulo.HasValue)
+            // Verificación mejorada de archivos
+            if (!File.Exists(rutaBordes) || !File.Exists(rutaColoreados))
             {
-                // Movimiento hacia el ángulo dado
-                AnguloRotacion = angulo.Value + AjusteAnguloInicial;
+                string errorMsg = $"Archivos de bala no encontrados. Buscados en:\n" +
+                                $"Bordes: {rutaBordes}\n" +
+                                $"Colores: {rutaColoreados}\n" +
+                                $"BasePath: {BasePath}\n" +
+                                $"Directorio existe: {Directory.Exists(BasePath)}";
+
+                Debug.WriteLine(errorMsg);
+                throw new FileNotFoundException(errorMsg);
+            }
+
+            ConfigurarDireccionMovimiento(angulo, cursorPos);
+        }
+
+        private void VerificarArchivosBalas()
+        {
+            try
+            {
+                if (!Directory.Exists(BasePath))
+                    throw new DirectoryNotFoundException($"Directorio de balas no encontrado: {BasePath}");
+
+                if (!File.Exists(rutaBordes))
+                    throw new FileNotFoundException($"Archivo de bordes no encontrado: {rutaBordes}");
+
+                if (!File.Exists(rutaColoreados))
+                    throw new FileNotFoundException($"Archivo de colores no encontrado: {rutaColoreados}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error al cargar recursos de bala: {ex.Message}");
+                // Crear bitmap de fallback
+                CrearBitmapDeFallback();
+                throw; // Relanzar la excepción para manejo superior
+            }
+        }
+
+        private void CrearBitmapDeFallback()
+        {
+            bitmapCache = new Bitmap(20, 20);
+            using (Graphics g = Graphics.FromImage(bitmapCache))
+            {
+                g.Clear(Color.Transparent);
+                g.FillEllipse(Brushes.Red, 0, 0, 20, 20);
+            }
+        }
+
+        private void ConfigurarDireccionMovimiento(float? angulo, PointF? cursorPos)
+        {
+            if (Tipo == TipoBala.BalaAvion && cursorPos.HasValue)
+            {
+                // Dirección hacia el cursor
+                float deltaX = cursorPos.Value.X - PosX;
+                float deltaY = cursorPos.Value.Y - PosY;
+
+                // Normalizar vector
+                float length = (float)Math.Sqrt(deltaX * deltaX + deltaY * deltaY);
+                if (length > 0)
+                {
+                    dx = deltaX / length;
+                    dy = deltaY / length;
+                }
+                else
+                {
+                    dx = 0;
+                    dy = -1;
+                }
+
+                // Ángulo en grados (convertido de radianes)
+                AnguloRotacion = (float)(Math.Atan2(dy, dx) * (180 / Math.PI));
+            }
+            else if ((Tipo == TipoBala.BalaTorreta || Tipo == TipoBala.BalaEnemigo) && angulo.HasValue)
+            {
+                AnguloRotacion = angulo.Value;
                 float radians = (float)(Math.PI / 180 * angulo.Value);
                 dx = (float)Math.Cos(radians);
                 dy = (float)Math.Sin(radians);
             }
-            else if (tipo == TipoBala.BalaAvion)
+            else if (Tipo == TipoBala.BalaAvion) // Disparo recto hacia arriba por defecto
             {
                 dx = 0f;
-                dy = -1f; // Hacia arriba
-            }
-            else if (tipo == TipoBala.BalaEnemigo)
-            {
-                dx = 0f;
-                dy = 1f; // Hacia abajo
+                dy = -1f;
+                AnguloRotacion = -90; // Apuntando hacia arriba
             }
         }
 
@@ -107,23 +200,23 @@ namespace GrupalNaves
             PosX += dx * Velocidad;
             PosY += dy * Velocidad;
         }
-        // Método para regenerar el bitmap cacheado
+
         public void Dibujar(Graphics g)
         {
-            if (bitmapCache == null || Escala != lastEscala)
+            if (bitmapCache == null)
             {
-                RegenerarCache();
-                lastEscala = Escala;
+                if (!cacheGlobal.TryGetValue(Tipo, out bitmapCache))
+                {
+                    RegenerarCache(); // genera una vez por tipo y escala fija
+                    cacheGlobal[Tipo] = bitmapCache; // ¡NO clones!
+                }
             }
 
             GraphicsState estado = g.Save();
             try
             {
                 g.TranslateTransform(PosX, PosY);
-                if (Tipo == TipoBala.BalaTorreta)
-                {
-                    g.RotateTransform(AnguloRotacion); // Apunta hacia el jugador
-                }
+                g.RotateTransform(AnguloRotacion + 90); // depende de cómo está orientada la imagen
                 g.DrawImage(bitmapCache, -bitmapCache.Width / 2, -bitmapCache.Height / 2);
             }
             finally
@@ -131,102 +224,123 @@ namespace GrupalNaves
                 g.Restore(estado);
             }
         }
-        // Método para regenerar el bitmap cacheado
+
         private void RegenerarCache()
         {
-            var coloreados = LeerColoreados(rutaColoreados);
-            var bordes = LeerBordes(rutaBordes);
-
-            int maxX = coloreados.Max(c => c.puntos.Max(p => p.X)) + 5;
-            int maxY = coloreados.Max(c => c.puntos.Max(p => p.Y)) + 5;
-            int width = (int)(maxX * Escala);
-            int height = (int)(maxY * Escala);
-
-            bitmapCache?.Dispose();
-            bitmapCache = new Bitmap(width, height);
-
-            using (var g = Graphics.FromImage(bitmapCache))
+            try
             {
-                g.Clear(Color.Transparent);
-                g.ScaleTransform(Escala, Escala);
+                var coloreados = LeerColoreados(rutaColoreados);
+                var bordes = LeerBordes(rutaBordes);
 
-                foreach (var (color, puntos) in coloreados)
+                int maxX = coloreados.Max(c => c.puntos.Max(p => p.X)) + 5;
+                int maxY = coloreados.Max(c => c.puntos.Max(p => p.Y)) + 5;
+                int width = (int)(maxX * Escala);
+                int height = (int)(maxY * Escala);
+
+                bitmapCache?.Dispose();
+                bitmapCache = new Bitmap(width, height);
+
+                using (var g = Graphics.FromImage(bitmapCache))
                 {
-                    using (var b = new SolidBrush(color))
+                    g.Clear(Color.Transparent);
+                    g.ScaleTransform(Escala, Escala);
+
+                    foreach (var (color, puntos) in coloreados)
                     {
-                        foreach (var p in puntos)
+                        using (var b = new SolidBrush(color))
                         {
-                            g.FillRectangle(b, p.X, p.Y, 2, 2);
+                            foreach (var p in puntos)
+                            {
+                                g.FillRectangle(b, p.X, p.Y, 2, 2);
+                            }
+                        }
+                    }
+
+                    foreach (var grupo in bordes)
+                    {
+                        if (grupo.Count > 1)
+                        {
+                            g.DrawPolygon(Pens.Black, grupo.ToArray());
                         }
                     }
                 }
-
-                foreach (var grupo in bordes)
-                {
-                    if (grupo.Count > 1)
-                    {
-                        g.DrawPolygon(Pens.Black, grupo.ToArray());
-                    }
-                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error al regenerar cache de bala: {ex.Message}");
+                CrearBitmapDeFallback();
             }
         }
 
-        // Método para leer los grupos coloreados desde un archivo
         private List<(Color color, List<Point> puntos)> LeerColoreados(string ruta)
         {
             var grupos = new List<(Color, List<Point>)>();
-            using (var fs = new FileStream(ruta, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-            using (var sr = new StreamReader(fs))
+            try
             {
-                string linea;
-                while ((linea = sr.ReadLine()) != null)
+                using (var fs = new FileStream(ruta, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var sr = new StreamReader(fs))
                 {
-                    if (string.IsNullOrWhiteSpace(linea) || linea.StartsWith("//")) continue;
-                    var partes = linea.Split(' ');
-                    var colorPart = partes[0].Split(',');
-                    var color = Color.FromArgb(
-                        int.Parse(colorPart[0]),
-                        int.Parse(colorPart[1]),
-                        int.Parse(colorPart[2]));
-                    var puntos = partes.Skip(1).Select(p =>
+                    string linea;
+                    while ((linea = sr.ReadLine()) != null)
                     {
-                        var coords = p.Split(',');
-                        return new Point(int.Parse(coords[0]), int.Parse(coords[1]));
-                    }).ToList();
-                    grupos.Add((color, puntos));
+                        if (string.IsNullOrWhiteSpace(linea) || linea.StartsWith("//")) continue;
+
+                        var partes = linea.Split(' ');
+                        var colorPart = partes[0].Split(',');
+                        var color = Color.FromArgb(
+                            int.Parse(colorPart[0]),
+                            int.Parse(colorPart[1]),
+                            int.Parse(colorPart[2]));
+
+                        var puntos = partes.Skip(1).Select(p =>
+                        {
+                            var coords = p.Split(',');
+                            return new Point(int.Parse(coords[0]), int.Parse(coords[1]));
+                        }).ToList();
+
+                        grupos.Add((color, puntos));
+                    }
                 }
             }
-            return grupos;
-        }
-        //MAU!
-        // Método para leer los bordes desde un archivo
-        private List<List<Point>> LeerBordes(string ruta)
-        {
-            var grupos = new List<List<Point>>();
-            foreach (var linea in File.ReadAllLines(ruta))
+            catch (Exception ex)
             {
-                if (string.IsNullOrWhiteSpace(linea) || linea.StartsWith("//")) continue;
-                var puntos = linea.Split(' ')
-                                  .Select(p =>
-                                  {
-                                      var coords = p.Split(',');
-                                      return new Point(int.Parse(coords[0]), int.Parse(coords[1]));
-                                  }).ToList();
-                grupos.Add(puntos);
+                Debug.WriteLine($"Error al leer coloreados: {ex.Message}");
+                throw;
             }
             return grupos;
         }
 
-        public RectangleF ObtenerRect()
+        private List<List<Point>> LeerBordes(string ruta)
         {
-            return new RectangleF(PosX - 5, PosY - 5, 10, 10);
+            var grupos = new List<List<Point>>();
+            try
+            {
+                foreach (var linea in File.ReadAllLines(ruta))
+                {
+                    if (string.IsNullOrWhiteSpace(linea) || linea.StartsWith("//")) continue;
+
+                    var puntos = linea.Split(' ')
+                                    .Select(p =>
+                                    {
+                                        var coords = p.Split(',');
+                                        return new Point(int.Parse(coords[0]), int.Parse(coords[1]));
+                                    }).ToList();
+
+                    grupos.Add(puntos);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error al leer bordes: {ex.Message}");
+                throw;
+            }
+            return grupos;
         }
+
         public bool EstaFueraDePantalla(Size tamañoPantalla)
         {
             return PosX < -100 || PosX > tamañoPantalla.Width + 100 ||
                    PosY < -100 || PosY > tamañoPantalla.Height + 100;
         }
-
     }
-
 }

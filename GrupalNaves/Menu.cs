@@ -171,7 +171,7 @@ namespace GrupalNaves
         {
             try
             {
-                Naves navePreview = new Naves(tipo)
+                Naves navePreview = new Naves(tipo, null)
                 {
                     PosX = pb.Width / 2,
                     PosY = pb.Height / 2,
