@@ -21,7 +21,8 @@ namespace GrupalNaves
         public float PosX { get; set; }
         public float PosY { get; set; }
         public float Escala { get; set; } = 0.3f;
-        public float AnguloRotacion { get; set; } = 180f;
+        public float AnguloRotacionEnemigo { get; set; } = 90f;
+        public float AnguloRotacion { get; set; } = 0f;
         public int Vida { get; set; } = 50; // Vida del enemigo
         public int DañoColision { get; private set; } = 30; // Daño al chocar con el jugador
 
@@ -79,7 +80,7 @@ namespace GrupalNaves
                 }
 
                 // Calcular ángulo de rotación para que mire al jugador
-                AnguloRotacion = (float)(Math.Atan2(dy, dx) * (180 / Math.PI)) + 90; // +90 para ajuste de la imagen
+                AnguloRotacion = (float)(Math.Atan2(dy, dx) * (180 / Math.PI)) - AnguloRotacionEnemigo; // +90 para ajuste de la imagen
             }
 
             // Mover y eliminar balas del enemigo que ya están en el Form1
@@ -248,7 +249,7 @@ namespace GrupalNaves
             return grupos;
         }
 
-        private List<List<Point>> LeerBordes(string ruta)
+        private List<List<Point>> LeerBordes(string ruta) 
         {
             var grupos = new List<List<Point>>();
             if (!File.Exists(ruta)) return grupos;

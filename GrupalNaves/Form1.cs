@@ -37,6 +37,9 @@ namespace GrupalNaves
         // Instancia del HUD (ahora para dibujo directo)
         private HUD hudJuego;
 
+        // Referencia al menú principal
+        private Menu mainMenu; // <--- NUEVO: Para poder volver al menú principal
+
         public Form1()
         {
             instance = this;
@@ -70,7 +73,7 @@ namespace GrupalNaves
             listaObstaculos = new List<Obstaculos>();
             balasJugador = new List<Bala>();
             torres = new List<Torre>();
-            enemigos = new List<AvionEnemigo>(); // Asegúrate de que esta línea esté presente y se ejecute
+            enemigos = new List<AvionEnemigo>();
 
             // Eventos del formulario
             this.Paint += DibujarElementosJuego;
@@ -78,9 +81,9 @@ namespace GrupalNaves
             this.KeyUp += Form1_DebugKeyUp; // Mantener para depuración
 
             // Mostrar menú de selección de nave
-            Menu menuSeleccion = new Menu();
-            menuSeleccion.NaveSeleccionada += OnNaveSeleccionada;
-            menuSeleccion.MostrarMenu();
+            mainMenu = new Menu(); // <--- CAMBIO: Inicializar el campo mainMenu
+            mainMenu.NaveSeleccionada += OnNaveSeleccionada;
+            mainMenu.MostrarMenu();
 
             // Inicializar el HUD (solo los datos, no los controles visuales)
             hudJuego = new HUD(this, 100); // 100 es la vida inicial por defecto
@@ -382,8 +385,8 @@ namespace GrupalNaves
                     hudJuego?.ActualizarVida(naveJugador.Vida);
                     if (naveDestruida)
                     {
-                        MessageBox.Show("¡Nave destruida!");
-                        this.Close();
+                        MostrarMenuGameOver(); // <--- CAMBIO: Redirigir al menú de Game Over
+                        return; // Salir de este método ya que el juego ha terminado
                     }
                     continue;
                 }
@@ -417,8 +420,8 @@ namespace GrupalNaves
                         hudJuego?.ActualizarVida(naveJugador.Vida);
                         if (naveDestruida)
                         {
-                            MessageBox.Show("¡Nave destruida!");
-                            this.Close();
+                            MostrarMenuGameOver(); // <--- CAMBIO: Redirigir al menú de Game Over
+                            return; // Salir de este método
                         }
                     }
                 }
@@ -434,8 +437,8 @@ namespace GrupalNaves
                     hudJuego?.ActualizarVida(naveJugador.Vida);
                     if (naveDestruida)
                     {
-                        MessageBox.Show("¡Nave destruida!");
-                        this.Close();
+                        MostrarMenuGameOver(); // <--- CAMBIO: Redirigir al menú de Game Over
+                        return; // Salir de este método
                     }
                 }
             }
@@ -472,8 +475,8 @@ namespace GrupalNaves
                     hudJuego?.ActualizarVida(naveJugador.Vida);
                     if (naveDestruida)
                     {
-                        MessageBox.Show("¡Nave destruida!");
-                        this.Close();
+                        MostrarMenuGameOver(); // <--- CAMBIO: Redirigir al menú de Game Over
+                        return; // Salir de este método
                     }
                 }
             }
@@ -505,6 +508,79 @@ namespace GrupalNaves
             timerGeneracionEnemigos?.Dispose();
 
             hudJuego?.Dispose();
+        }
+
+        /// <summary>
+        /// Muestra el menú de Game Over y maneja las opciones del usuario.
+        /// </summary>
+        private void MostrarMenuGameOver()
+        {
+            // Detener todos los timers del juego
+            timerActualizacionJuego?.Stop();
+            timerDisparoTorreta?.Stop();
+            timerGeneracionEnemigos?.Stop();
+            gestorMovimiento?.DetenerMovimiento(); // Detener también el movimiento de la nave
+
+            // Ocultar el formulario de juego actual
+            this.Hide();
+
+            var gameOverMenu = new MenuGameOver();
+
+            gameOverMenu.ReiniciarJuego += () =>
+            {
+                // Reiniciar el juego: Limpiar listas, reiniciar nave, etc.
+                ReiniciarEstadoJuego();
+                this.Show(); // Mostrar Form1 de nuevo
+            };
+
+            gameOverMenu.VolverAlMenuPrincipal += () =>
+            {
+                this.Close(); // Cerrar el formulario de juego actual
+                // Para volver al menú principal de forma limpia, lo más sencillo es reiniciar la aplicación.
+                // Esto hará que Program.cs se ejecute de nuevo y muestre el Menu inicial.
+                Application.Restart();
+            };
+
+            gameOverMenu.SalirDelJuego += () =>
+            {
+                Application.Exit(); // Cierra completamente la aplicación
+            };
+
+            gameOverMenu.MostrarMenuGameOver();
+        }
+
+        /// <summary>
+        /// Restablece el estado del juego para un nuevo inicio.
+        /// </summary>
+        private void ReiniciarEstadoJuego()
+        {
+            // Limpiar todas las listas de elementos del juego
+            balasEnemigos.Clear();
+            listaObstaculos.Clear();
+            torres.Clear();
+            balasTorreta.Clear();
+            balasJugador.Clear();
+            enemigos.Clear();
+
+            // Reiniciar la nave del jugador a su estado inicial
+            if (naveJugador != null)
+            {
+                naveJugador.Vida = 100; // O la vida inicial que desees
+                naveJugador.PosX = this.ClientSize.Width / 2;
+                naveJugador.PosY = this.ClientSize.Height - 200;
+                // Puedes también reestablecer su tipo si quieres que el jugador re-seleccione
+                // this.avionSeleccionado = TipoAvion.Avion1; // O dejar el último seleccionado
+            }
+
+            // Reiniciar el HUD
+            hudJuego = new HUD(this, naveJugador.Vida); // Crear una nueva instancia de HUD o resetear la existente
+
+            // Volver a inicializar el juego (esto configura las torres, nave, timers, etc.)
+            InicializarJuego();
+            this.Focus();
+            this.ActiveControl = null;
+            this.Select();
+            this.Invalidate();
         }
     }
 }

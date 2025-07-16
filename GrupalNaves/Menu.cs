@@ -25,7 +25,7 @@ namespace GrupalNaves
                 menuForm.BackColor = Color.FromArgb(28, 28, 28);
                 menuForm.Padding = new Padding(10);
 
-                // **Etiqueta de título mejorada**
+                // **Etiqueta de título mejorada** 
                 var titleLabel = new Label()
                 {
                     Text = "¡SELECCIONA TU NAVE!",
@@ -184,24 +184,11 @@ namespace GrupalNaves
                     g.Clear(pb.BackColor);
                     g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-                    // Asegúrate de que tu método Dibujar en la clase Naves 
-                    // toma el tercer y cuarto parámetro (drawX, drawY) o se ajusta a PosX, PosY.
-                    // Si tu clase Naves tiene AnchoBase y AltoBase (recomendado):
-                    // int scaledWidth = (int)(navePreview.AnchoBase * navePreview.Escala);
-                    // int scaledHeight = (int)(navePreview.AltoBase * navePreview.Escala);
-                    // int drawX = (pb.Width - scaledWidth) / 2;
-                    // int drawY = (pb.Height - scaledHeight) / 2;
-                    // navePreview.Dibujar(g, navePreview.Escala, drawX, drawY);
 
                     // Si no tienes AnchoBase/AltoBase y tu método Dibujar espera solo Graphics y Escala,
                     // y usa PosX/PosY internamente:
                     navePreview.Dibujar(g, navePreview.Escala); // Usará navePreview.PosX y navePreview.PosY
 
-                    // Si tu método Dibujar espera solo Graphics, Escala, y no usa PosX/PosY de la clase:
-                    // int estimatedBaseSize = 100; // Ajusta este valor si tus naves son más grandes/pequeñas
-                    // int drawX = (int)((pb.Width / 2) - (navePreview.Escala * estimatedBaseSize / 2));
-                    // int drawY = (int)((pb.Height / 2) - (navePreview.Escala * estimatedBaseSize / 2));
-                    // navePreview.Dibujar(g, navePreview.Escala, drawX, drawY); // Si tu Dibujar tiene (Graphics, float, int, int)
                 }
                 pb.Image = bmp;
             }
