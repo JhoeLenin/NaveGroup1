@@ -1,10 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.IO;
-using System.Linq;
 using System.Windows.Forms;
+using System.Collections.Generic;
+using System.IO; // Necesario para Path y Directory
+using System.Linq; // Necesario para .ToList()
+using System.Drawing.Drawing2D; // ¡Esta directiva es necesaria para GraphicsState!
 
 namespace GrupalNaves
 {
@@ -13,218 +13,198 @@ namespace GrupalNaves
         private static string BasePath = Path.GetFullPath(
             Path.Combine(
                 Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.FullName,
-                "Assets", "Naves", "Enemigo"
+                "Assets",
+                "Enemigos" // Ajusta esta ruta si tus assets de enemigos están en otro lugar
             )
         );
 
-        private readonly string rutaBordes;
-        private readonly string rutaColoreados;
-
         public float PosX { get; set; }
         public float PosY { get; set; }
-        public float Escala { get; set; } = 0.4f;
-        public float Velocidad { get; set; } = 2f;
-        public int Vida { get; set; } = 50;
-        public int DañoColision { get; set; } = 20;
-        public bool Activo { get; set; } = true;
+        public float Escala { get; set; } = 0.3f;
+        public float AnguloRotacion { get; set; } = 180f;
+        public int Vida { get; set; } = 50; // Vida del enemigo
+        public int DañoColision { get; private set; } = 30; // Daño al chocar con el jugador
 
-        // Temporizador para disparos
-        private int intervaloDisparo = 2000; // 2 segundos
-        private DateTime ultimoDisparo;
-        public List<Bala> Balas { get; private set; }
+        private Naves naveJugadorObjetivo; // Referencia a la nave del jugador
+        public List<Bala> Balas { get; private set; } // Balas disparadas por este enemigo
 
-        private Bitmap bitmapCache;
-        private float lastEscala = -1;
-        private float AnguloRotacion = 0f;
+        private System.Windows.Forms.Timer timerDisparo; // Temporizador para que este enemigo dispare
+        private DateTime lastShotTime; // Para controlar el tiempo del último disparo
 
+        // Bounds para colisiones
         public RectangleF Bounds
         {
             get
             {
-                if (bitmapCache == null)
-                    return RectangleF.Empty;
-
-                float width = bitmapCache.Width;
-                float height = bitmapCache.Height;
-
-                // Como dibujas el enemigo desde el centro:
-                return new RectangleF(PosX, PosY, width, height);
+                // Ajusta estos valores según el tamaño real de tu enemigo
+                float width = 200 * Escala; // Ejemplo: 80px de ancho
+                float height = 200 * Escala; // Ejemplo: 80px de alto
+                return new RectangleF(PosX - width / 2, PosY - height / 2, width, height);
             }
         }
-        // constructor que recibe la posición inicial del avión enemigo
-        public AvionEnemigo(float posX, float posY, Naves jugador)
+
+        public AvionEnemigo(float x, float y, Naves targetNave)
         {
-            PosX = posX;
-            PosY = posY;
-            Balas = new List<Bala>();
-            ultimoDisparo = DateTime.Now;
+            PosX = x;
+            PosY = y;
+            this.naveJugadorObjetivo = targetNave;
+            this.Balas = new List<Bala>(); // Inicializa la lista de balas del enemigo
 
-            rutaBordes = Path.Combine(BasePath, "bordes.txt");
-            rutaColoreados = Path.Combine(BasePath, "coloreados.txt");
+            // Inicializar timer de disparo
+            timerDisparo = new System.Windows.Forms.Timer();
+            timerDisparo.Interval = new Random().Next(1500, 4000); // Dispara cada 1.5 - 4 segundos
+            timerDisparo.Tick += TimerDisparo_Tick;
+            timerDisparo.Start();
+            lastShotTime = DateTime.Now; // Inicializa el tiempo del último disparo
 
-            if (!File.Exists(rutaBordes) || !File.Exists(rutaColoreados))
-            {
-                throw new FileNotFoundException("Archivos de avión enemigo no encontrados");
-            }
-
-            // Apuntar al jugador desde el principio
-            float dx = jugador.PosX - PosX;
-            float dy = jugador.PosY - PosY;
-            AnguloRotacion = (float)(Math.Atan2(dy, dx) * (180 / Math.PI));
+            RegenerarCache(Escala); // Generar el bitmap cache al crear el enemigo
         }
 
-
+        // Método para actualizar la posición y lógica del enemigo
         public void Actualizar(Naves jugador)
         {
-            if (!Activo) return;
-
-            // Movimiento similar a torretas (persecución suave)
-            float centroEnemigoX = PosX + (bitmapCache?.Width ?? 0) / 2f * Escala;
-            float centroEnemigoY = PosY + (bitmapCache?.Height ?? 0) / 2f * Escala;
-
-            float centroJugadorX = jugador.PosX;
-            float centroJugadorY = jugador.PosY;
-
-            // Calcular dirección hacia el jugador
-            float dx = centroJugadorX - centroEnemigoX;
-            float dy = centroJugadorY - centroEnemigoY;
-            float distancia = (float)Math.Sqrt(dx * dx + dy * dy);
-
-            if (distancia > 0)
+            // Lógica de movimiento: por ejemplo, seguir al jugador
+            if (jugador != null)
             {
-                dx /= distancia;
-                dy /= distancia;
+                float velocidad = 2f; // Velocidad de movimiento del enemigo
+                float dx = jugador.PosX - PosX;
+                float dy = jugador.PosY - PosY;
 
-                // Movimiento más lento cuando está cerca
-                float factorVelocidad = Math.Min(1, distancia / 200f);
-                PosX += dx * Velocidad * factorVelocidad;
-                PosY += dy * Velocidad * factorVelocidad;
-            }
+                float distancia = (float)Math.Sqrt(dx * dx + dy * dy);
 
-            // Calcular ángulo hacia el jugador
-            float anguloObjetivo = (float)(Math.Atan2(dy, dx) * (180 / Math.PI));
-
-            // Asegura que ambos ángulos estén entre -180 y 180
-            float diferencia = ((anguloObjetivo - AnguloRotacion + 540) % 360) - 180;
-
-            // Limita el giro máximo por frame (en grados)
-            float velocidadGiro = 0.5f;
-
-            if (Math.Abs(diferencia) < velocidadGiro)
-            {
-                AnguloRotacion = anguloObjetivo; // Ya casi igual
-            }
-            else
-            {
-                AnguloRotacion += Math.Sign(diferencia) * velocidadGiro;
-            }
-
-
-            // Disparar si es tiempo
-            if ((DateTime.Now - ultimoDisparo).TotalMilliseconds >= intervaloDisparo)
-            {
-                Disparar(jugador);
-                ultimoDisparo = DateTime.Now;
-            }
-
-            // Actualizar balas
-            for (int i = Balas.Count - 1; i >= 0; i--)
-            {
-                Balas[i].Actualizar();
-                if (Balas[i].EstaFueraDePantalla(Form1.ActiveForm?.ClientSize ?? new Size(1920, 1080)))
+                if (distancia > 5) // Mover solo si no está demasiado cerca
                 {
-                    Balas.RemoveAt(i);
+                    PosX += (dx / distancia) * velocidad;
+                    PosY += (dy / distancia) * velocidad;
+                }
+
+                // Calcular ángulo de rotación para que mire al jugador
+                AnguloRotacion = (float)(Math.Atan2(dy, dx) * (180 / Math.PI)) + 90; // +90 para ajuste de la imagen
+            }
+
+            // Mover y eliminar balas del enemigo que ya están en el Form1
+            // (La lógica de actualización y eliminación de balas de enemigos se maneja en Form1)
+
+            // El timerDisparo se encarga de la generación de balas.
+        }
+
+        // Dibuja el enemigo
+        public void Dibujar(Graphics g)
+        {
+            if (bitmapCache == null) return;
+
+            // Declarar GraphicsState fuera del bloque try para que sea accesible en finally
+            GraphicsState estadoOriginal = null;
+            try
+            {
+                estadoOriginal = g.Save(); // Guardar el estado original del Graphics
+                g.TranslateTransform(PosX, PosY);
+                g.RotateTransform(AnguloRotacion);
+                g.DrawImage(bitmapCache, -bitmapCache.Width / 2, -bitmapCache.Height / 2);
+            }
+            finally
+            {
+                // Solo restaurar si el estado se guardó correctamente
+                if (estadoOriginal != null)
+                {
+                    g.Restore(estadoOriginal);
                 }
             }
         }
 
-        private void Disparar(Naves jugador)
-        {
-            // Calcular ángulo hacia el jugador (como las torretas)
-            float centroEnemigoX = PosX + (bitmapCache?.Width ?? 0) / 2f * Escala;
-            float centroEnemigoY = PosY + (bitmapCache?.Height ?? 0) / 2f * Escala;
-
-            float centroJugadorX = jugador.PosX;
-            float centroJugadorY = jugador.PosY;
-
-            float dx = centroJugadorX - centroEnemigoX;
-            float dy = centroJugadorY - centroEnemigoY;
-            float angulo = (float)(Math.Atan2(dy, dx) * (180 / Math.PI));
-
-            // Crear bala en la posición del enemigo apuntando al jugador
-            var bala = new Bala(TipoBala.BalaEnemigo, centroEnemigoX, centroEnemigoY, angulo);
-            Form1.Instance?.AgregarBalaEnemigo(bala);
-        }
-
+        // Método para que el enemigo reciba daño
         public bool RecibirDaño(int cantidad)
         {
             Vida -= cantidad;
-            if (Vida <= 0)
-            {
-                Activo = false;
-                return true; // Enemigo destruido
-            }
-            return false;
+            return Vida <= 0; // Devuelve true si el enemigo ha sido destruido
         }
 
-        public void Dibujar(Graphics g)
+        // Evento de disparo del enemigo
+        private void TimerDisparo_Tick(object sender, EventArgs e)
         {
-            if (!Activo) return;
+            if (naveJugadorObjetivo == null) return;
 
-            if (bitmapCache == null || Escala != lastEscala)
-            {
-                RegenerarCache();
-                lastEscala = Escala;
-            }
+            // Evitar disparos excesivamente rápidos si el timer se activa varias veces
+            if ((DateTime.Now - lastShotTime).TotalMilliseconds < timerDisparo.Interval - 100) return;
 
-            GraphicsState estado = g.Save();
-            try
-            {
-                // Calcular centro para rotación
-                float centerX = bitmapCache.Width / 2f * Escala;
-                float centerY = bitmapCache.Height / 2f * Escala;
+            // Calcular posición de la bala (ej: desde el centro del enemigo)
+            float centroX = PosX + (bitmapCache?.Width ?? 0) / 2f;
+            float centroY = PosY + (bitmapCache?.Height ?? 0) / 2f;
 
-                g.TranslateTransform(PosX + centerX, PosY + centerY);
-                g.RotateTransform(AnguloRotacion - 90); // +90 para ajuste como las torretas
-                g.DrawImage(bitmapCache, -centerX, -centerY);
-            }
-            finally
-            {
-                g.Restore(estado);
-            }
+            // Calcular ángulo hacia el jugador
+            float dx = naveJugadorObjetivo.PosX - centroX;
+            float dy = naveJugadorObjetivo.PosY - centroY;
+            float angulo = (float)(Math.Atan2(dy, dx) * (180 / Math.PI));
 
-            // Dibujar balas
-            foreach (var bala in Balas)
-            {
-                bala.Dibujar(g);
-            }
+            var balaEnemiga = new Bala(TipoBala.BalaEnemigo, centroX, centroY, angulo);
+
+            // ¡Aquí es donde agregas la bala a la lista global en Form1!
+            // Usa el singleton Form1.Instance para acceder al método.
+            Form1.Instance.AgregarBalaEnemigo(balaEnemiga);
+
+            lastShotTime = DateTime.Now; // Actualiza el tiempo del último disparo
         }
 
-        private void RegenerarCache()
+        // ---- Lógica de carga de sprites (similar a Naves.cs, asegurate de que exista) ----
+        private Bitmap bitmapCache;
+        // private float lastEscala = -1; // No es necesario si la escala es fija para el enemigo
+
+        private void RegenerarCache(float escala)
         {
+            if (bitmapCache != null)
+                bitmapCache.Dispose();
+
+            // Asume que tienes un archivo "enemigo.txt" o similar en la carpeta Assets/Enemigos
+            string rutaBordes = Path.GetFullPath(
+            Path.Combine(
+            Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.FullName,
+            "Assets",
+            "Naves",
+            "Enemigo",
+            "bordes.txt"
+            )
+        ); // O el nombre de tu archivo de bordes de enemigo
+            string rutaColoreados = Path.GetFullPath(
+            Path.Combine(
+            Directory.GetParent(Directory.GetCurrentDirectory()).Parent.Parent.FullName,
+            "Assets",
+            "Naves",
+            "Enemigo",
+            "coloreados.txt"
+            )
+        ); // O el nombre de tu archivo de coloreados de enemigo
+
+            if (!File.Exists(rutaBordes) || !File.Exists(rutaColoreados))
+            {
+                // Fallback o lanzar excepción si los archivos no existen
+                // Debug.WriteLine($"Advertencia: Archivos de enemigo no encontrados en {BasePath}");
+                return;
+            }
+
             var coloreados = LeerColoreados(rutaColoreados);
             var bordes = LeerBordes(rutaBordes);
 
-            int maxX = coloreados.Max(c => c.puntos.Max(p => p.X)) + 5;
-            int maxY = coloreados.Max(c => c.puntos.Max(p => p.Y)) + 5;
-            int width = (int)(maxX * Escala);
-            int height = (int)(maxY * Escala);
+            int maxX = coloreados.Any() ? coloreados.Max(c => c.puntos.Any() ? c.puntos.Max(p => p.X) : 0) : 0;
+            int maxY = coloreados.Any() ? coloreados.Max(c => c.puntos.Any() ? c.puntos.Max(p => p.Y) : 0) : 0;
 
-            bitmapCache?.Dispose();
+            int width = (int)(maxX * escala) + 10;
+            if (width <= 0) width = 10;
+            int height = (int)(maxY * escala) + 10;
+            if (height <= 0) height = 10;
+
             bitmapCache = new Bitmap(width, height);
-
             using (var g = Graphics.FromImage(bitmapCache))
             {
                 g.Clear(Color.Transparent);
-                g.ScaleTransform(Escala, Escala);
+                g.ScaleTransform(escala, escala);
 
                 foreach (var (color, puntos) in coloreados)
                 {
-                    using (var b = new SolidBrush(color))
+                    using (SolidBrush brush = new SolidBrush(color))
                     {
                         foreach (var p in puntos)
                         {
-                            g.FillRectangle(b, p.X, p.Y, 2, 2);
+                            g.FillRectangle(brush, p.X, p.Y, 2, 2);
                         }
                     }
                 }
@@ -242,6 +222,8 @@ namespace GrupalNaves
         private List<(Color color, List<Point> puntos)> LeerColoreados(string ruta)
         {
             var grupos = new List<(Color, List<Point>)>();
+            if (!File.Exists(ruta)) return grupos;
+
             using (var fs = new FileStream(ruta, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (var sr = new StreamReader(fs))
             {
@@ -269,15 +251,17 @@ namespace GrupalNaves
         private List<List<Point>> LeerBordes(string ruta)
         {
             var grupos = new List<List<Point>>();
+            if (!File.Exists(ruta)) return grupos;
+
             foreach (var linea in File.ReadAllLines(ruta))
             {
                 if (string.IsNullOrWhiteSpace(linea) || linea.StartsWith("//")) continue;
                 var puntos = linea.Split(' ')
-                                .Select(p =>
-                                {
-                                    var coords = p.Split(',');
-                                    return new Point(int.Parse(coords[0]), int.Parse(coords[1]));
-                                }).ToList();
+                                    .Select(p =>
+                                    {
+                                        var coords = p.Split(',');
+                                        return new Point(int.Parse(coords[0]), int.Parse(coords[1]));
+                                    }).ToList();
                 grupos.Add(puntos);
             }
             return grupos;

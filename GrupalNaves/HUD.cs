@@ -1,110 +1,66 @@
-﻿using System;
-using System.Drawing;
-using System.Windows.Forms;
+﻿using System.Drawing;
+using System.Windows.Forms; // Necesario para la referencia a Form y ClientSize
 
 namespace GrupalNaves
 {
-    // Clase para manejar el HUD (Heads-Up Display) del juego
     public class HUD
     {
-        private Panel panelPrincipal;
-        private Label labelVida;
-        private Label labelTiempo;
-        private Label labelPuntaje;
+        private int vidaActual;
+        private int puntajeActual;
+        private Form formularioPrincipal; // Referencia al formulario para obtener dimensiones
 
-        private System.Windows.Forms.Timer timerTiempo;
-        private DateTime inicioJuego;
-        private int _puntaje = 0;
+        // Caches para Font y Brush (creados una sola vez)
+        private Font hudFont;
+        private SolidBrush hudBrush;
 
-        // Propiedad pública para acceder al puntaje
-        public int Puntaje
+        // Constructor
+        public HUD(Form form, int vidaInicial)
         {
-            get => _puntaje;
-            private set
+            this.formularioPrincipal = form;
+            this.vidaActual = vidaInicial;
+            this.puntajeActual = 0;
+
+            // Inicializar Font y Brush una sola vez
+            hudFont = new Font("Arial", 24, FontStyle.Bold);
+            hudBrush = new SolidBrush(Color.White); // Color para el texto del HUD
+        }
+
+        // Método para actualizar la vida (solo cambia el valor interno)
+        public void ActualizarVida(int nuevaVida)
+        {
+            if (this.vidaActual != nuevaVida) // Solo actualiza si hay un cambio real
             {
-                _puntaje = value;
-                labelPuntaje.Text = $"Puntaje: {_puntaje}";
+                this.vidaActual = nuevaVida;
             }
         }
 
-        public Control[] Controles => new Control[] { panelPrincipal, labelPuntaje };
-
-        // Constructor que inicializa el HUD
-        public HUD(Form form, int vidaInicial)
-        {
-            // Panel izquierdo: vida y tiempo
-            panelPrincipal = new Panel
-            {
-                Location = new Point(10, 10),
-                Size = new Size(200, 60),
-                BackColor = Color.FromArgb(100, Color.Black),
-                BorderStyle = BorderStyle.FixedSingle
-            };
-
-            labelVida = new Label
-            {
-                Text = $"Vida: {vidaInicial}",
-                ForeColor = Color.White,
-                Font = new Font("Arial", 12, FontStyle.Bold),
-                Location = new Point(10, 5),
-                AutoSize = true
-            };
-
-            labelTiempo = new Label
-            {
-                Text = "Tiempo: 00:00",
-                ForeColor = Color.White,
-                Font = new Font("Arial", 12, FontStyle.Bold),
-                Location = new Point(10, 30),
-                AutoSize = true
-            };
-
-            panelPrincipal.Controls.Add(labelVida);
-            panelPrincipal.Controls.Add(labelTiempo);
-            form.Controls.Add(panelPrincipal);
-
-            // Label de puntaje (derecha)
-            labelPuntaje = new Label
-            {
-                Text = "Puntaje: 0",
-                ForeColor = Color.Yellow,
-                Font = new Font("Arial", 14, FontStyle.Bold),
-                Location = new Point(form.ClientSize.Width - 160, 10),
-                AutoSize = true,
-                BackColor = Color.Transparent
-            };
-            form.Controls.Add(labelPuntaje);
-
-            // Timer para actualizar tiempo
-            inicioJuego = DateTime.Now;
-            timerTiempo = new System.Windows.Forms.Timer();
-            timerTiempo.Interval = 1000;
-            timerTiempo.Tick += (s, e) =>
-            {
-                TimeSpan t = DateTime.Now - inicioJuego;
-                labelTiempo.Text = $"Tiempo: {t.Minutes:D2}:{t.Seconds:D2}";
-            };
-            timerTiempo.Start();
-        }
-
-        public void ActualizarVida(int nuevaVida)
-        {
-            labelVida.Text = $"Vida: {nuevaVida}";
-        }
-
+        // Método para agregar puntaje (solo cambia el valor interno)
         public void AgregarPuntaje(int puntos)
         {
-            Puntaje += puntos; // Usamos la propiedad para mantener la sincronización
+            this.puntajeActual += puntos;
         }
 
-        public void Pausar(bool pausado)
+        // Método para dibujar el HUD directamente en el contexto gráfico del formulario
+        public void Dibujar(Graphics g)
         {
-            timerTiempo.Enabled = !pausado;
+            // Dibuja la vida en la esquina superior izquierda
+            string textoVida = $"Vida: {vidaActual}";
+            g.DrawString(textoVida, hudFont, hudBrush, 10, 10); // 10px de margen
+
+            // Dibuja el puntaje en la esquina superior derecha
+            string textoPuntaje = $"Puntaje: {puntajeActual}";
+
+            // Medir el tamaño del texto para posicionarlo correctamente
+            SizeF textSize = g.MeasureString(textoPuntaje, hudFont);
+            float xPuntaje = formularioPrincipal.ClientSize.Width - textSize.Width - 10; // Margen derecho
+            g.DrawString(textoPuntaje, hudFont, hudBrush, xPuntaje, 10); // 10px de margen superior
         }
 
-        public void MoverPuntajeDerecha(Form form)
+        // Método para liberar recursos
+        public void Dispose()
         {
-            labelPuntaje.Location = new Point(form.ClientSize.Width - 160, 10);
+            hudFont?.Dispose();
+            hudBrush?.Dispose();
         }
     }
 }

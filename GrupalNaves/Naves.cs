@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing.Drawing2D;
+using System.IO; // Necesario para Path y Directory
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Drawing; // Necesario para Bitmap, Graphics, Color, Point, RectangleF
 
 namespace GrupalNaves
 {
@@ -29,8 +31,9 @@ namespace GrupalNaves
         public float AnguloRotacion { get; set; } = 0f;
         public TipoAvion Tipo { get; private set; }
 
-        // Propiedades de las Naves
+        // Propiedad de la vida de la nave (manteniendo el nombre 'Vida')
         public int Vida { get; set; } = 100;
+
         public RectangleF Bounds
         {
             get
@@ -41,15 +44,15 @@ namespace GrupalNaves
                 return new RectangleF(PosX - width / 2, PosY - height / 2, width, height);
             }
         }
-        // Propiedad para determinar si la nave está activa (no destruida)
+
         public bool RecibirDaño(int cantidad)
         {
-            Vida -= cantidad;
+            Vida -= cantidad; // Resta el daño a la propiedad Vida
             return Vida <= 0; // Devuelve true si la nave fue destruida
         }
 
         // Constructor que recibe el tipo de avión
-        public Naves(TipoAvion tipo, Form1 form)
+        public Naves(TipoAvion tipo, Form1 form) // Cambiado a Form1 en lugar de Form
         {
             this.formulario = form;
             Tipo = tipo;
@@ -64,13 +67,13 @@ namespace GrupalNaves
                 throw new FileNotFoundException($"Archivos no encontrados para el avión {tipo}");
             }
 
-            this.formulario = formulario;
+            // La vida se inicializa a 100 por defecto en la declaración de la propiedad
         }
 
         public void Dibujar(Graphics g, float escala)
         {
-            var coloreados = LeerColoreados(rutaColoreados);
-            var bordes = LeerBordes(rutaBordes);
+            // var coloreados = LeerColoreados(rutaColoreados); // No necesitas leer en cada dibujo
+            // var bordes = LeerBordes(rutaBordes); // No necesitas leer en cada dibujo
 
             if (bitmapCache == null || escala != lastEscala)
             {
@@ -109,10 +112,16 @@ namespace GrupalNaves
             var bordes = LeerBordes(rutaBordes);
 
             // Calcular tamaño necesario
-            int maxX = coloreados.Max(c => c.puntos.Max(p => p.X));
-            int maxY = coloreados.Max(c => c.puntos.Max(p => p.Y));
+            // Asegurarse de que las listas no estén vacías para evitar errores de Max()
+            int maxX = coloreados.Any() ? coloreados.Max(c => c.puntos.Any() ? c.puntos.Max(p => p.X) : 0) : 0;
+            int maxY = coloreados.Any() ? coloreados.Max(c => c.puntos.Any() ? c.puntos.Max(p => p.Y) : 0) : 0;
+
+            // Asegurarse de que el tamaño mínimo sea razonable para evitar Bitmaps de 0x0
             int width = (int)(maxX * escala) + 10;
+            if (width <= 0) width = 10; // Mínimo de 10px para evitar errores
             int height = (int)(maxY * escala) + 10;
+            if (height <= 0) height = 10; // Mínimo de 10px para evitar errores
+
 
             bitmapCache = new Bitmap(width, height);
             using (var g = Graphics.FromImage(bitmapCache))
@@ -177,11 +186,11 @@ namespace GrupalNaves
             {
                 if (string.IsNullOrWhiteSpace(linea) || linea.StartsWith("//")) continue;
                 var puntos = linea.Split(' ')
-                                  .Select(p =>
-                                  {
-                                      var coords = p.Split(',');
-                                      return new Point(int.Parse(coords[0]), int.Parse(coords[1]));
-                                  }).ToList();
+                                    .Select(p =>
+                                    {
+                                        var coords = p.Split(',');
+                                        return new Point(int.Parse(coords[0]), int.Parse(coords[1]));
+                                    }).ToList();
                 grupos.Add(puntos);
             }
             return grupos;

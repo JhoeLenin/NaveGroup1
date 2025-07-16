@@ -3,7 +3,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using System.Collections.Generic;
 using System.Diagnostics;
-
+using System.Linq; // Necesario para .ToList() en las colecciones
 
 namespace GrupalNaves
 {
@@ -13,39 +13,33 @@ namespace GrupalNaves
         private static Form1 instance;
         // Constructor estático para inicializar la instancia
         public static Form1 Instance => instance;
+
         private Naves naveJugador;
         private TipoAvion avionSeleccionado = TipoAvion.Avion1;
         private Movimiento gestorMovimiento;
-        // Lista de balas disparadas por el jugador (asi no desaparecen junto con el avion que las instancia)
+
+        // Listas de elementos del juego
         private List<Bala> balasEnemigos = new List<Bala>();
-        // Lista de obstáculos
         private List<Obstaculos> listaObstaculos;
-        // Lista de torres (torretas)
         private List<Torre> torres;
-        // Lista de balas disparadas por las torretas
         private List<Bala> balasTorreta;
-        // Temporizador para disparos de torretas
-        private System.Windows.Forms.Timer timerDisparoTorreta;
-        // Temporizador para actualizar las balas
-        private System.Windows.Forms.Timer timerActualizacionBalas;
-
         private List<Bala> balasJugador;
-        // Bitmap de fondo (opcional, si se desea un fondo estático)
-        private FondoJuego fondoJuego;
-
-        // Lista de enemigos (aviones enemigos)
         private List<AvionEnemigo> enemigos;
+
+        // Temporizadores del juego
+        private System.Windows.Forms.Timer timerDisparoTorreta;
+        private System.Windows.Forms.Timer timerActualizacionJuego; // Timer principal del juego
         private System.Windows.Forms.Timer timerGeneracionEnemigos;
 
-        // Propiedad para acceder a la lista de balas del jugador
-        public void AgregarBalaEnemigo(Bala bala)
-        {
-            balasEnemigos.Add(bala);
-        }
+        // Elementos visuales
+        private FondoJuego fondoJuego;
+
+        // Instancia del HUD (ahora para dibujo directo)
+        private HUD hudJuego;
 
         public Form1()
         {
-            instance = this; // ¡Asigna la instancia estática aquí!
+            instance = this;
             InitializeComponent();
             Debug.WriteLine($"Tamaño real del cliente: {this.ClientSize}");
 
@@ -55,14 +49,13 @@ namespace GrupalNaves
                 ControlStyles.UserPaint |
                 ControlStyles.OptimizedDoubleBuffer,
                 true);
-            // Configuración de la ventana
             this.DoubleBuffered = true;
             this.ClientSize = new Size(1920, 1080);
             this.Text = "Juego de Naves Espaciales";
             this.KeyPreview = true;
-            this.Resize += Form1_Resize; // Nuevo evento para redimensionamiento
+            this.Resize += Form1_Resize;
 
-            // Cargar fondo usando la nueva clase
+            // Cargar fondo del juego
             try
             {
                 fondoJuego = FondoJuego.CrearDesdeAssets("fondo.png", this.ClientSize);
@@ -73,25 +66,29 @@ namespace GrupalNaves
                 fondoJuego = null;
             }
 
-            // Inicializar componentes
+            // Inicializar listas
             listaObstaculos = new List<Obstaculos>();
             balasJugador = new List<Bala>();
+            torres = new List<Torre>();
+            enemigos = new List<AvionEnemigo>(); // Asegúrate de que esta línea esté presente y se ejecute
 
-            // Eventos
+            // Eventos del formulario
             this.Paint += DibujarElementosJuego;
             this.KeyDown += Form1_KeyDown;
-            this.KeyUp += Form1_DebugKeyUp;
+            this.KeyUp += Form1_DebugKeyUp; // Mantener para depuración
 
-            // Mostrar menú de selección
+            // Mostrar menú de selección de nave
             Menu menuSeleccion = new Menu();
             menuSeleccion.NaveSeleccionada += OnNaveSeleccionada;
             menuSeleccion.MostrarMenu();
+
+            // Inicializar el HUD (solo los datos, no los controles visuales)
+            hudJuego = new HUD(this, 100); // 100 es la vida inicial por defecto
         }
 
-        // Método que se ejecuta al pintar el formulario
+        // Método que se ejecuta al pintar el fondo del formulario
         protected override void OnPaintBackground(PaintEventArgs e)
         {
-            // Solo dibujamos el fondo, no llamamos al método base para evitar parpadeo
             fondoJuego?.Dibujar(e.Graphics);
         }
 
@@ -99,39 +96,12 @@ namespace GrupalNaves
         private void Form1_Resize(object sender, EventArgs e)
         {
             fondoJuego?.CambiarTamaño(this.ClientSize);
-            this.Invalidate(); // Redibujar
+            this.Invalidate();
         }
 
-        // Método que se ejecuta cuando se presiona una tecla mientras el formulario tiene el foco
         private void Form1_DebugKeyDown(object sender, KeyEventArgs e)
         {
-            // Imprime en la consola de depuración qué tecla fue presionada
             Debug.WriteLine($"Tecla presionada: {e.KeyCode}");
-            // Verifica si la tecla presionada es la barra espaciadora y si la nave del jugador existe
-            if (e.KeyCode == Keys.Space && naveJugador != null)
-            {
-                // Si la lista de balas del jugador aún no fue creada, la inicializa
-                if (balasJugador == null)
-                {
-                    balasJugador = new List<Bala>();
-                    Debug.WriteLine("Lista de balas del jugador inicializada");
-                }
-
-                // Calcula la posición inicial de la bala: centrada en la nave y un poco más arriba (para simular que sale del frente)
-                float centroX = naveJugador.PosX;
-                float centroY = naveJugador.PosY - (50 * naveJugador.Escala);
-
-                Debug.WriteLine($"Creando bala en ({centroX}, {centroY})");
-                // Obtener posición actual del cursor
-                Point cursorPos = this.PointToClient(Cursor.Position);
-                // Crea una nueva bala de tipo 'BalaAvion' en la posición calculada
-                var bala = new Bala(TipoBala.BalaAvion, centroX, centroY);
-                // Agrega la nueva bala a la lista de balas activas del jugador
-                balasJugador.Add(bala);
-
-                // Imprime en la consola de depuración cuántas balas hay en la lista actualmente
-                Debug.WriteLine($"Balas del jugador: {balasJugador.Count}");
-            }
         }
 
         private void Form1_DebugKeyUp(object sender, KeyEventArgs e)
@@ -154,21 +124,13 @@ namespace GrupalNaves
         private void InicializarJuego()
         {
             // Inicializar torres con posiciones visibles
-            torres = new List<Torre>();
+            torres.Clear();
             try
             {
-                // Torre izquierda
-                var torreIzquierda = new Torre(150, 150, 0.2f)
-                {
-                    AjusteAngulo = 90f // Ajuste para que mire hacia la derecha inicialmente
-                };
+                var torreIzquierda = new Torre(150, 150, 0.2f) { AjusteAngulo = 90f };
                 torres.Add(torreIzquierda);
 
-                // Torre derecha
-                var torreDerecha = new Torre(this.ClientSize.Width - 250, 150, 0.2f)
-                {
-                    AjusteAngulo = 90f // Ajuste para que mire hacia la izquierda inicialmente
-                };
+                var torreDerecha = new Torre(this.ClientSize.Width - 250, 150, 0.2f) { AjusteAngulo = 90f };
                 torres.Add(torreDerecha);
             }
             catch (Exception ex)
@@ -176,7 +138,6 @@ namespace GrupalNaves
                 MessageBox.Show($"Error al cargar torres: {ex.Message}");
             }
 
-            // Inicializar balas de torreta
             balasTorreta = new List<Bala>();
 
             // Inicializar nave jugador
@@ -185,9 +146,10 @@ namespace GrupalNaves
                 naveJugador = new Naves(avionSeleccionado, this)
                 {
                     PosX = this.ClientSize.Width / 2,
-                    PosY = this.ClientSize.Height - 200, // 200px desde abajo
-                    Escala = 0.5f
+                    PosY = this.ClientSize.Height - 200,
+                    Escala = 0.6f
                 };
+                hudJuego?.ActualizarVida(naveJugador.Vida);
             }
             catch (Exception ex)
             {
@@ -213,72 +175,72 @@ namespace GrupalNaves
 
             // Configurar el temporizador para disparos de torretas
             timerDisparoTorreta = new System.Windows.Forms.Timer();
-            timerDisparoTorreta.Interval = 1000; // Cada 1 segundo
+            timerDisparoTorreta.Interval = 1500; // Cada 1.5 segundos
             timerDisparoTorreta.Tick += TimerDisparoTorreta_Tick;
             timerDisparoTorreta.Start();
 
-            // Configurar el temporizador para actualizar las balas
-            timerActualizacionBalas = new System.Windows.Forms.Timer();
-            timerActualizacionBalas.Interval = 33; // ≈ 60 FPS
-            timerActualizacionBalas.Tick += TimerActualizacionBalas_Tick;
-            timerActualizacionBalas.Start();
+            // Configurar el temporizador principal del juego
+            if (timerActualizacionJuego == null)
+            {
+                timerActualizacionJuego = new System.Windows.Forms.Timer();
+                timerActualizacionJuego.Interval = 15; // Aproximadamente 60 FPS
+                timerActualizacionJuego.Tick += TimerActualizacionJuego_Tick;
+            }
+            timerActualizacionJuego.Start();
 
-            // Inicializar enemigos
-            enemigos = new List<AvionEnemigo>();
-
+            // *** Punto clave para la generación de enemigos ***
+            // Asegurarse de que la lista de enemigos esté limpia antes de empezar a añadir nuevos
+            enemigos.Clear();
             // Configurar temporizador para generación de enemigos
-            timerGeneracionEnemigos = new System.Windows.Forms.Timer();
-            timerGeneracionEnemigos.Interval = 5000; // Cada 5 segundos
-            timerGeneracionEnemigos.Tick += TimerGeneracionEnemigos_Tick;
-            timerGeneracionEnemigos.Start();
+            if (timerGeneracionEnemigos == null) // Evitar crear múltiples instancias
+            {
+                timerGeneracionEnemigos = new System.Windows.Forms.Timer();
+                timerGeneracionEnemigos.Interval = 5000; // Cada 5 segundos
+                timerGeneracionEnemigos.Tick += TimerGeneracionEnemigos_Tick;
+            }
+            timerGeneracionEnemigos.Start(); // ¡Asegúrate de que este timer se inicie!
+            Debug.WriteLine("Timer de generación de enemigos iniciado."); // Para depuración
         }
 
-        // Evento para manejar el disparo del jugador
+        public void AgregarBalaEnemigo(Bala bala)
+        {
+            balasEnemigos.Add(bala);
+        }
+
         private void Form1_KeyDown(object sender, KeyEventArgs e)
         {
-            Debug.WriteLine($"Tecla presionada: {e.KeyCode}");
-
-            // Disparar con barra espaciadora
             if (e.KeyCode == Keys.Space && naveJugador != null)
             {
                 if (balasJugador == null)
                     balasJugador = new List<Bala>();
 
-                // Crear bala desde el centro de la nave jugador
                 float centroX = naveJugador.PosX;
-                float centroY = naveJugador.PosY - (50 * naveJugador.Escala); // Disparar desde el frente
+                float centroY = naveJugador.PosY - (50 * naveJugador.Escala);
 
-                // Obtener posición actual del cursor
                 Point cursorPos = this.PointToClient(Cursor.Position);
-
-                // Crear bala que va hacia el cursor
                 var bala = new Bala(TipoBala.BalaAvion, centroX, centroY, null, 0.15f, cursorPos);
                 balasJugador.Add(bala);
             }
         }
 
-        // Evento para manejar el disparo de las torretas
         private void TimerDisparoTorreta_Tick(object sender, EventArgs e)
         {
             if (torres == null || naveJugador == null) return;
 
             foreach (var torre in torres)
             {
-                // Posición desde el centro de la torre
                 float centroX = torre.PosX + (torre.bitmapCache?.Width ?? 0) / 2f;
                 float centroY = torre.PosY + (torre.bitmapCache?.Height ?? 0) / 2f;
 
                 var bala = new Bala(TipoBala.BalaTorreta, centroX, centroY, torre.AnguloRotacion);
                 balasTorreta.Add(bala);
             }
-
-            this.Invalidate(); // Redibujar
         }
 
-        // Evento para actualizar las balas de torreta
-        private void TimerActualizacionBalas_Tick(object sender, EventArgs e)
+        // Timer principal para toda la lógica del juego y el redibujado
+        private void TimerActualizacionJuego_Tick(object sender, EventArgs e)
         {
-            // Actualizar balas de torreta
+            // Actualizar lógica de balas
             for (int i = balasTorreta.Count - 1; i >= 0; i--)
             {
                 balasTorreta[i].Actualizar();
@@ -288,7 +250,6 @@ namespace GrupalNaves
                 }
             }
 
-            // Actualizar balas del jugador (si existen)
             if (balasJugador != null)
             {
                 for (int i = balasJugador.Count - 1; i >= 0; i--)
@@ -301,7 +262,6 @@ namespace GrupalNaves
                 }
             }
 
-            // Actualizar balas de enemigos
             for (int i = balasEnemigos.Count - 1; i >= 0; i--)
             {
                 balasEnemigos[i].Actualizar();
@@ -320,16 +280,21 @@ namespace GrupalNaves
                 }
             }
 
-            // Solo llamamos a VerificarColisiones, no a Invalidate
+            // Verificar colisiones
             VerificarColisiones();
+
+            // Forzar el redibujado de todo el formulario una vez por tick
+            this.Invalidate();
         }
 
-        // Evento para generar enemigos periódicamente
         private void TimerGeneracionEnemigos_Tick(object sender, EventArgs e)
         {
-            if (naveJugador == null || enemigos == null) return;
+            if (naveJugador == null || enemigos == null)
+            {
+                Debug.WriteLine("No se pueden generar enemigos: Nave Jugador o lista de enemigos es nula.");
+                return;
+            }
 
-            // Generar enemigo en posición aleatoria en la parte superior
             Random rnd = new Random();
             float x = rnd.Next(100, this.ClientSize.Width - 100);
             float y = rnd.Next(50, 200);
@@ -338,56 +303,40 @@ namespace GrupalNaves
             {
                 var enemigo = new AvionEnemigo(x, y, naveJugador);
                 enemigos.Add(enemigo);
+                Debug.WriteLine($"Enemigo generado en: X={x}, Y={y}. Total de enemigos: {enemigos.Count}"); // Para depuración
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error al crear enemigo: {ex.Message}");
+                // Si hay un error al cargar el asset del enemigo, no se creará
+                MessageBox.Show($"Error al generar enemigo: {ex.Message}. Asegúrate de que los archivos 'enemigo_bordes.txt' y 'enemigo_coloreados.txt' estén en la ruta correcta.");
             }
         }
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
-            this.Invalidate(); // Redibujar para actualizar rotación de la nave
         }
 
         private void DibujarElementosJuego(object sender, PaintEventArgs e)
         {
             var g = e.Graphics;
-            g.Clear(Color.White);
 
-            // Dibujar fondo del juego
-            fondoJuego?.Dibujar(g);
-
-            // Configuración óptima de renderizado
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighSpeed;
             g.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighSpeed;
             g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
 
-            // Dibujar enemigos primero
-            if (enemigos != null)
-            {
-                foreach (var enemigo in enemigos)
-                {
-                    enemigo.Dibujar(g);
-                }
-            }
+            // Dibujar elementos del juego
+            // *** Asegúrate de que esta línea esté presente y sin comentarios ***
+            enemigos?.ForEach(enemigo => enemigo.Dibujar(g));
+            balasEnemigos.ForEach(bala => bala.Dibujar(g));
 
-            // Dibujar balas de enemigos
-            foreach (var bala in balasEnemigos)
-            {
-                bala.Dibujar(g);
-            }
-
-            // Dibujar torres
             if (torres != null)
             {
                 foreach (var torre in torres)
                 {
-                    // Solo calcular rotación si hay nave jugador
                     if (naveJugador != null)
                     {
-                        // Calcular ángulo desde el centro de la torre al centro del avión
                         float centroTorreX = torre.PosX + (torre.bitmapCache?.Width ?? 0) / 2f;
                         float centroTorreY = torre.PosY + (torre.bitmapCache?.Height ?? 0) / 2f;
                         float centroAvionX = naveJugador.PosX;
@@ -395,14 +344,10 @@ namespace GrupalNaves
 
                         float dx = centroAvionX - centroTorreX;
                         float dy = centroAvionY - centroTorreY;
-
                         torre.AnguloRotacion = (float)(Math.Atan2(dy, dx) * (180 / Math.PI));
                     }
-
-                    // Dibujar torre con rotación actual
                     torre.Dibujar(g);
 
-                    // Dibujar punto de referencia para debug (opcional)
                     using (var brush = new SolidBrush(Color.Red))
                     {
                         g.FillEllipse(brush, torre.PosX - 3, torre.PosY - 3, 6, 6);
@@ -410,95 +355,70 @@ namespace GrupalNaves
                 }
             }
 
-            // Dibujar balas de torreta
-            if (balasTorreta != null)
-            {
-                foreach (var bala in balasTorreta)
-                {
-                    bala.Dibujar(g);
-                }
-            }
+            balasTorreta.ForEach(bala => bala.Dibujar(g));
+            balasJugador?.ForEach(bala => bala.Dibujar(g));
 
-            // Dibujar balas del jugador
-            if (balasJugador != null)
-            {
-                foreach (var bala in balasJugador)
-                {
-                    bala.Dibujar(g);
-                }
-            }
+            /*listaObstaculos?.ForEach(obstaculo => obstaculo.Dibujar(g));*/
 
-            // Dibujar obstáculos
-            /*foreach (var obstaculo in listaObstaculos)
-            {
-                obstaculo.Dibujar(g);
-            }*/
-
-            // Dibujar nave
             naveJugador?.Dibujar(g, naveJugador.Escala);
+
+            hudJuego?.Dibujar(g);
         }
 
-        // Método para manejar el movimiento del jugador
         private void VerificarColisiones()
         {
-            bool necesitaRedibujar = false;
+            if (naveJugador == null) return;
 
-            // Verificar colisiones con enemigos
-            if (enemigos != null && naveJugador != null)
+            // Colisiones con enemigos
+            for (int i = enemigos.Count - 1; i >= 0; i--)
             {
-                for (int i = enemigos.Count - 1; i >= 0; i--)
+                var enemigo = enemigos[i];
+
+                // Jugador vs Enemigo
+                if (naveJugador.Bounds.IntersectsWith(enemigo.Bounds))
                 {
-                    var enemigo = enemigos[i];
-
-                    // Colisión entre jugador y enemigo
-                    if (naveJugador.Bounds.IntersectsWith(enemigo.Bounds))
+                    bool naveDestruida = naveJugador.RecibirDaño(enemigo.DañoColision);
+                    enemigos.RemoveAt(i);
+                    hudJuego?.ActualizarVida(naveJugador.Vida);
+                    if (naveDestruida)
                     {
-                        bool naveDestruida = naveJugador.RecibirDaño(enemigo.DañoColision);
-                        enemigos.RemoveAt(i);
-                        necesitaRedibujar = true;
+                        MessageBox.Show("¡Nave destruida!");
+                        this.Close();
+                    }
+                    continue;
+                }
 
+                // Balas Jugador vs Enemigo
+                if (balasJugador != null)
+                {
+                    for (int j = balasJugador.Count - 1; j >= 0; j--)
+                    {
+                        if (enemigo.Bounds.IntersectsWith(balasJugador[j].Bounds))
+                        {
+                            bool enemigoDestruido = enemigo.RecibirDaño(20);
+                            balasJugador.RemoveAt(j);
+                            if (enemigoDestruido)
+                            {
+                                enemigos.RemoveAt(i);
+                                hudJuego?.AgregarPuntaje(100);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Balas Enemigo vs Jugador
+                foreach (var bala in enemigo.Balas.ToList())
+                {
+                    if (naveJugador.Bounds.IntersectsWith(bala.Bounds))
+                    {
+                        bool naveDestruida = naveJugador.RecibirDaño(10);
+                        enemigo.Balas.Remove(bala);
+                        hudJuego?.ActualizarVida(naveJugador.Vida);
                         if (naveDestruida)
                         {
                             MessageBox.Show("¡Nave destruida!");
                             this.Close();
-                        }
-                        continue;
-                    }
-
-                    // Colisión entre balas del jugador y enemigos
-                    if (balasJugador != null)
-                    {
-                        for (int j = balasJugador.Count - 1; j >= 0; j--)
-                        {
-                            if (enemigo.Bounds.IntersectsWith(balasJugador[j].Bounds))
-                            {
-                                bool enemigoDestruido = enemigo.RecibirDaño(20);
-                                balasJugador.RemoveAt(j);
-                                necesitaRedibujar = true;
-
-                                if (enemigoDestruido)
-                                {
-                                    enemigos.RemoveAt(i);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    // Colisión entre balas de enemigos y jugador
-                    foreach (var bala in enemigo.Balas.ToList())
-                    {
-                        if (naveJugador.Bounds.IntersectsWith(bala.Bounds))
-                        {
-                            bool naveDestruida = naveJugador.RecibirDaño(10);
-                            enemigo.Balas.Remove(bala);
-                            necesitaRedibujar = true;
-
-                            if (naveDestruida)
-                            {
-                                MessageBox.Show("¡Nave destruida!");
-                                this.Close();
-                            }
                         }
                     }
                 }
@@ -507,11 +427,11 @@ namespace GrupalNaves
             // Colisiones con balas de torreta
             for (int i = balasTorreta.Count - 1; i >= 0; i--)
             {
-                if (naveJugador != null && balasTorreta[i].Bounds.IntersectsWith(naveJugador.Bounds))
+                if (naveJugador.Bounds.IntersectsWith(balasTorreta[i].Bounds))
                 {
                     bool naveDestruida = naveJugador.RecibirDaño(10);
                     balasTorreta.RemoveAt(i);
-
+                    hudJuego?.ActualizarVida(naveJugador.Vida);
                     if (naveDestruida)
                     {
                         MessageBox.Show("¡Nave destruida!");
@@ -520,7 +440,7 @@ namespace GrupalNaves
                 }
             }
 
-            // Colisión entre balas del jugador y torres
+            // Colisión balas jugador vs torres
             if (balasJugador != null)
             {
                 for (int i = balasJugador.Count - 1; i >= 0; i--)
@@ -531,10 +451,10 @@ namespace GrupalNaves
                         {
                             bool torreDestruida = torres[j].RecibirDaño(20);
                             balasJugador.RemoveAt(i);
-
                             if (torreDestruida)
                             {
                                 torres.RemoveAt(j);
+                                hudJuego?.AgregarPuntaje(500);
                             }
                             break;
                         }
@@ -542,14 +462,14 @@ namespace GrupalNaves
                 }
             }
 
-            // Colisiones con balas enemigas independientes
+            // Colisiones con balas enemigas independientes (si las hay)
             for (int i = balasEnemigos.Count - 1; i >= 0; i--)
             {
-                if (naveJugador != null && balasEnemigos[i].Bounds.IntersectsWith(naveJugador.Bounds))
+                if (naveJugador.Bounds.IntersectsWith(balasEnemigos[i].Bounds))
                 {
                     bool naveDestruida = naveJugador.RecibirDaño(10);
                     balasEnemigos.RemoveAt(i);
-
+                    hudJuego?.ActualizarVida(naveJugador.Vida);
                     if (naveDestruida)
                     {
                         MessageBox.Show("¡Nave destruida!");
@@ -558,33 +478,33 @@ namespace GrupalNaves
                 }
             }
 
-            // Colisión jugador vs torres (sin daño)
-            if (naveJugador != null)
+            // Colisión jugador vs torres (sin daño, solo para interacción)
+            foreach (var torre in torres)
             {
-                foreach (var torre in torres)
+                if (naveJugador.Bounds.IntersectsWith(torre.Bounds))
                 {
-                    if (naveJugador.Bounds.IntersectsWith(torre.Bounds))
-                    {
-                        // Solo rebote o empuje
-                    }
+                    // Lógica para empuje o rebote si es necesario
                 }
-            }
-
-            // Solo redibujar si hubo cambios visibles
-            if (necesitaRedibujar)
-            {
-                this.Invalidate();
             }
         }
 
-        // Método para manejar el movimiento del jugador
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             base.OnFormClosed(e);
 
-            // Liberar recursos
             fondoJuego?.Dispose();
             gestorMovimiento?.DetenerMovimiento();
+
+            timerActualizacionJuego?.Stop();
+            timerActualizacionJuego?.Dispose();
+
+            timerDisparoTorreta?.Stop();
+            timerDisparoTorreta?.Dispose();
+
+            timerGeneracionEnemigos?.Stop();
+            timerGeneracionEnemigos?.Dispose();
+
+            hudJuego?.Dispose();
         }
     }
 }
