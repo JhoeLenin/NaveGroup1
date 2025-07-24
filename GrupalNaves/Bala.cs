@@ -87,6 +87,7 @@ namespace GrupalNaves
         {
             get
             {
+                // Devuelve el área ocupada por la bala para propósitos de colisión
                 float size = 10 * Escala;
                 return new RectangleF(PosX - size / 2, PosY - size / 2, size, size);
             }
@@ -99,16 +100,17 @@ namespace GrupalNaves
             PosY = y;
             Escala = escala;
 
-            // Configuración de rutas con verificación mejorada
+            // Configuración de rutas a archivos de recursos de la bala (bordes y colores)
             string carpeta = tipo.ToString();
             rutaBordes = Path.Combine(BasePath, carpeta, "bordes.txt");
             rutaColoreados = Path.Combine(BasePath, carpeta, "coloreados.txt");
 
+            // Mensajes de depuración para verificar las rutas
             Debug.WriteLine($"Intentando cargar balas desde: {BasePath}");
             Debug.WriteLine($"Ruta bordes: {rutaBordes}");
             Debug.WriteLine($"Ruta colores: {rutaColoreados}");
 
-            // Verificación mejorada de archivos
+            // Validación de existencia de archivos
             if (!File.Exists(rutaBordes) || !File.Exists(rutaColoreados))
             {
                 string errorMsg = $"Archivos de bala no encontrados. Buscados en:\n" +
@@ -120,7 +122,7 @@ namespace GrupalNaves
                 Debug.WriteLine(errorMsg);
                 throw new FileNotFoundException(errorMsg);
             }
-
+            // Configura la dirección en la que se moverá la bala
             ConfigurarDireccionMovimiento(angulo, cursorPos);
         }
 
@@ -128,6 +130,7 @@ namespace GrupalNaves
         {
             try
             {
+                // Verifica si el directorio base y los archivos requeridos existen
                 if (!Directory.Exists(BasePath))
                     throw new DirectoryNotFoundException($"Directorio de balas no encontrado: {BasePath}");
 
@@ -140,7 +143,7 @@ namespace GrupalNaves
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error al cargar recursos de bala: {ex.Message}");
-                // Crear bitmap de fallback
+                // Si falla, se crea una representación visual básica de la bala
                 CrearBitmapDeFallback();
                 throw; // Relanzar la excepción para manejo superior
             }
@@ -148,6 +151,7 @@ namespace GrupalNaves
 
         private void CrearBitmapDeFallback()
         {
+            // Crea una imagen básica de bala (círculo rojo) si fallan los archivos
             bitmapCache = new Bitmap(20, 20);
             using (Graphics g = Graphics.FromImage(bitmapCache))
             {
@@ -160,7 +164,7 @@ namespace GrupalNaves
         {
             if (Tipo == TipoBala.BalaAvion && cursorPos.HasValue)
             {
-                // Dirección hacia el cursor
+                // Calcula la dirección de movimiento hacia el cursor
                 float deltaX = cursorPos.Value.X - PosX;
                 float deltaY = cursorPos.Value.Y - PosY;
 
@@ -174,7 +178,7 @@ namespace GrupalNaves
                 else
                 {
                     dx = 0;
-                    dy = -1;
+                    dy = -1;// Dirección por defecto (hacia arriba)
                 }
 
                 // Ángulo en grados (convertido de radianes)
@@ -229,33 +233,43 @@ namespace GrupalNaves
         {
             try
             {
+                // Lee los datos de color y puntos desde un archivo.
                 var coloreados = LeerColoreados(rutaColoreados);
+                // Lee los bordes desde otro archivo.
                 var bordes = LeerBordes(rutaBordes);
 
+                // Calcula el ancho y alto máximos considerando una escala.
                 int maxX = coloreados.Max(c => c.puntos.Max(p => p.X)) + 5;
                 int maxY = coloreados.Max(c => c.puntos.Max(p => p.Y)) + 5;
                 int width = (int)(maxX * Escala);
                 int height = (int)(maxY * Escala);
 
+                // Libera la memoria de un posible bitmap anterior.
                 bitmapCache?.Dispose();
+                // Crea un nuevo bitmap con las dimensiones calculadas.
                 bitmapCache = new Bitmap(width, height);
 
+                // Dibuja en el nuevo bitmap.
                 using (var g = Graphics.FromImage(bitmapCache))
                 {
+                    // Limpia con fondo transparente.
                     g.Clear(Color.Transparent);
+                    // Aplica la escala de dibujo.
                     g.ScaleTransform(Escala, Escala);
 
+                    // Dibuja los puntos coloreados.
                     foreach (var (color, puntos) in coloreados)
                     {
                         using (var b = new SolidBrush(color))
                         {
                             foreach (var p in puntos)
                             {
-                                g.FillRectangle(b, p.X, p.Y, 2, 2);
+                                g.FillRectangle(b, p.X, p.Y, 2, 2);// Dibuja pequeños cuadrados.
                             }
                         }
                     }
 
+                    // Dibuja los bordes si tienen más de un punto.
                     foreach (var grupo in bordes)
                     {
                         if (grupo.Count > 1)
@@ -267,6 +281,7 @@ namespace GrupalNaves
             }
             catch (Exception ex)
             {
+                // Muestra un mensaje de error y genera un bitmap alternativo.
                 Debug.WriteLine($"Error al regenerar cache de bala: {ex.Message}");
                 CrearBitmapDeFallback();
             }
@@ -277,14 +292,17 @@ namespace GrupalNaves
             var grupos = new List<(Color, List<Point>)>();
             try
             {
+                // Abre el archivo en modo lectura compartida.
                 using (var fs = new FileStream(ruta, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 using (var sr = new StreamReader(fs))
                 {
                     string linea;
                     while ((linea = sr.ReadLine()) != null)
                     {
+                        // Ignora líneas vacías o comentarios.
                         if (string.IsNullOrWhiteSpace(linea) || linea.StartsWith("//")) continue;
 
+                        // Obtiene el color y los puntos de la línea.
                         var partes = linea.Split(' ');
                         var colorPart = partes[0].Split(',');
                         var color = Color.FromArgb(
@@ -292,18 +310,20 @@ namespace GrupalNaves
                             int.Parse(colorPart[1]),
                             int.Parse(colorPart[2]));
 
+                        // Convierte los datos de puntos a una lista de coordenadas.
                         var puntos = partes.Skip(1).Select(p =>
                         {
                             var coords = p.Split(',');
                             return new Point(int.Parse(coords[0]), int.Parse(coords[1]));
                         }).ToList();
-
+                        // Agrega el grupo leído.
                         grupos.Add((color, puntos));
                     }
                 }
             }
             catch (Exception ex)
             {
+                // Informa el error al leer y relanza la excepción.
                 Debug.WriteLine($"Error al leer coloreados: {ex.Message}");
                 throw;
             }
@@ -315,10 +335,13 @@ namespace GrupalNaves
             var grupos = new List<List<Point>>();
             try
             {
+                // Lee todas las líneas del archivo.
                 foreach (var linea in File.ReadAllLines(ruta))
                 {
+                    // Ignora líneas vacías o comentarios.
                     if (string.IsNullOrWhiteSpace(linea) || linea.StartsWith("//")) continue;
 
+                    // Convierte los datos a una lista de puntos.
                     var puntos = linea.Split(' ')
                                     .Select(p =>
                                     {
@@ -326,11 +349,13 @@ namespace GrupalNaves
                                         return new Point(int.Parse(coords[0]), int.Parse(coords[1]));
                                     }).ToList();
 
+                    // Agrega el grupo de puntos.
                     grupos.Add(puntos);
                 }
             }
             catch (Exception ex)
             {
+                // Informa el error al leer y relanza la excepción.
                 Debug.WriteLine($"Error al leer bordes: {ex.Message}");
                 throw;
             }
@@ -339,6 +364,7 @@ namespace GrupalNaves
 
         public bool EstaFueraDePantalla(Size tamañoPantalla)
         {
+            // Verifica si la bala está fuera del área visible con un margen de 100px.
             return PosX < -100 || PosX > tamañoPantalla.Width + 100 ||
                    PosY < -100 || PosY > tamañoPantalla.Height + 100;
         }

@@ -4,7 +4,7 @@ using System.IO;
 
 namespace GrupalNaves
 {
-    // Clase que representa el fondo del juego, y se encarga de cargarlo, escalarlo y gestionarlooooo
+    // Clase que representa el fondo del juego, y se encarga de cargarlo, escalarlo y gestionarlooooooooo
     public class FondoJuego : IDisposable
     {
         // Imagen redimensionada del fondo, ajustada al tamaño de la ventana
