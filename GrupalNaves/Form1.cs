@@ -369,35 +369,39 @@ namespace GrupalNaves
             g.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighSpeed;
             g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
 
-            // Dibujar elementos del juego
+            // Dibujar elementos del juegooooo
             // *** Asegúrate de que esta línea esté presente y sin comentarios ***
             enemigos?.ForEach(enemigo => enemigo.Dibujar(g));
             balasEnemigos.ForEach(bala => bala.Dibujar(g));
-
+            // prueba
+            // Dibujar torres en orientacion hacia la nave jugador
             if (torres != null)
             {
                 foreach (var torre in torres)
                 {
                     if (naveJugador != null)
                     {
+                        // Variable para ubicar el centro de las torres
                         float centroTorreX = torre.PosX + (torre.bitmapCache?.Width ?? 0) / 2f;
                         float centroTorreY = torre.PosY + (torre.bitmapCache?.Height ?? 0) / 2f;
+                        // variable para ubicar el centro del avion jugador
                         float centroAvionX = naveJugador.PosX;
                         float centroAvionY = naveJugador.PosY;
-
+                        // distancia entre los centros de las torres y nave jugador
                         float dx = centroAvionX - centroTorreX;
                         float dy = centroAvionY - centroTorreY;
+                        // Formula matematica para calcular el ángulo de rotación
                         torre.AnguloRotacion = (float)(Math.Atan2(dy, dx) * (180 / Math.PI));
                     }
                     torre.Dibujar(g);
-
+                    
                     using (var brush = new SolidBrush(Color.Red))
                     {
                         g.FillEllipse(brush, torre.PosX - 3, torre.PosY - 3, 6, 6);
                     }
                 }
             }
-
+            // dibujar balas de torreta y jugador
             balasTorreta.ForEach(bala => bala.Dibujar(g));
             balasJugador?.ForEach(bala => bala.Dibujar(g));
 
