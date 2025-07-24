@@ -168,7 +168,7 @@ namespace GrupalNaves
             }
             return grupos;
         }
-
+        /// funcion///
         private List<List<Point>> LeerBordes(string ruta)
         {
             var grupos = new List<List<Point>>();

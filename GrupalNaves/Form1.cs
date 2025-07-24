@@ -37,6 +37,9 @@ namespace GrupalNaves
         // Instancia del HUD (ahora para dibujo directo)
         private HUD hudJuego;
 
+        // Referencia al menú principal
+        private Menu mainMenu; // <--- NUEVO: Para poder volver al menú principal
+
         public Form1()
         {
             instance = this;
@@ -70,7 +73,7 @@ namespace GrupalNaves
             listaObstaculos = new List<Obstaculos>();
             balasJugador = new List<Bala>();
             torres = new List<Torre>();
-            enemigos = new List<AvionEnemigo>(); // Asegúrate de que esta línea esté presente y se ejecute
+            enemigos = new List<AvionEnemigo>();
 
             // Eventos del formulario
             this.Paint += DibujarElementosJuego;
@@ -78,9 +81,9 @@ namespace GrupalNaves
             this.KeyUp += Form1_DebugKeyUp; // Mantener para depuración
 
             // Mostrar menú de selección de nave
-            Menu menuSeleccion = new Menu();
-            menuSeleccion.NaveSeleccionada += OnNaveSeleccionada;
-            menuSeleccion.MostrarMenu();
+            mainMenu = new Menu(); // <--- CAMBIO: Inicializar el campo mainMenu
+            mainMenu.NaveSeleccionada += OnNaveSeleccionada;
+            mainMenu.MostrarMenu();
 
             // Inicializar el HUD (solo los datos, no los controles visuales)
             hudJuego = new HUD(this, 100); // 100 es la vida inicial por defecto
@@ -99,26 +102,34 @@ namespace GrupalNaves
             this.Invalidate();
         }
 
+        // Este método se ejecuta cuando se presiona una tecla dentro del formulario (evento KeyDown)
         private void Form1_DebugKeyDown(object sender, KeyEventArgs e)
         {
+            // Escribe en la ventana de salida de depuración cuál tecla fue presionada
             Debug.WriteLine($"Tecla presionada: {e.KeyCode}");
         }
 
+        // Este método se ejecuta cuando el usuario suelta una tecla (evento KeyUp) dentro del formulario
         private void Form1_DebugKeyUp(object sender, KeyEventArgs e)
         {
+            // Escribe en la ventana de salida de depuración cuál tecla fue soltada
             Debug.WriteLine($"Tecla soltada: {e.KeyCode}");
         }
 
+        // Método que se ejecuta cuando el usuario selecciona una nave (tipo de avión)
         private void OnNaveSeleccionada(TipoAvion tipo)
         {
+            // Guarda la nave seleccionada en la variable de instancia 'avionSeleccionado'
             this.avionSeleccionado = tipo;
+
+            // Inicializa los recursos y configuraciones del juego según la nave elegida
             InicializarJuego();
 
-            // Preparar el formulario para recibir input
-            this.Focus();
-            this.ActiveControl = null;
-            this.Select();
-            this.Invalidate();
+            // Asegura que el formulario reciba correctamente los eventos del teclado
+            this.Focus();            // Da foco al formulario
+            this.ActiveControl = null; // Asegura que ningún control hijo tenga el foco (el foco queda en el formulario)
+            this.Select();           // Selecciona el formulario como receptor del input
+            this.Invalidate();       // Fuerza que el formulario se vuelva a repintar (redibujo)
         }
 
         private void InicializarJuego()
@@ -141,6 +152,7 @@ namespace GrupalNaves
             balasTorreta = new List<Bala>();
 
             // Inicializar nave jugador
+            //xd
             try
             {
                 naveJugador = new Naves(avionSeleccionado, this)
@@ -207,32 +219,63 @@ namespace GrupalNaves
             balasEnemigos.Add(bala);
         }
 
+        // Evento que se ejecuta cuando el usuario presiona una tecla estando en el formulario
         private void Form1_KeyDown(object sender, KeyEventArgs e)
         {
+            // Verifica si la tecla presionada es la barra espaciadora y si la nave del jugador no es nula
             if (e.KeyCode == Keys.Space && naveJugador != null)
             {
+                // Si la lista de balas aún no ha sido creada, la inicializa
                 if (balasJugador == null)
                     balasJugador = new List<Bala>();
 
+                // Obtiene la posición X del centro de la nave del jugador
                 float centroX = naveJugador.PosX;
+
+                // Obtiene la posición Y, desplazándola hacia arriba 50 unidades multiplicadas por la escala de la nave
                 float centroY = naveJugador.PosY - (50 * naveJugador.Escala);
 
+                // Obtiene la posición actual del cursor del mouse, traducida a coordenadas relativas al formulario
                 Point cursorPos = this.PointToClient(Cursor.Position);
-                var bala = new Bala(TipoBala.BalaAvion, centroX, centroY, null, 0.15f, cursorPos);
+
+                // Crea una nueva bala que parte desde la posición de la nave y va hacia la posición del cursor
+                var bala = new Bala(
+                    TipoBala.BalaAvion, // Tipo de bala
+                    centroX,            // Posición X inicial
+                    centroY,            // Posición Y inicial
+                    null,               // Objetivo nulo (posiblemente no se usa aquí)
+                    0.15f,              // Velocidad de la bala
+                    cursorPos);         // Posición destino (del cursor)
+
+                // Agrega la nueva bala a la lista de balas del jugador
                 balasJugador.Add(bala);
             }
         }
 
+        // Evento que se ejecuta periódicamente según el intervalo del TimerDisparoTorreta (cada X milisegundos)
         private void TimerDisparoTorreta_Tick(object sender, EventArgs e)
         {
+            // Si no existen torres o no existe la nave del jugador, no hace nada y termina el método
             if (torres == null || naveJugador == null) return;
 
+            // Recorre todas las torretas existentes
             foreach (var torre in torres)
             {
+                // Calcula la posición X del centro de la torreta tomando en cuenta el ancho de su imagen (bitmapCache)
                 float centroX = torre.PosX + (torre.bitmapCache?.Width ?? 0) / 2f;
+
+                // Calcula la posición Y del centro de la torreta tomando en cuenta la altura de su imagen (bitmapCache)
                 float centroY = torre.PosY + (torre.bitmapCache?.Height ?? 0) / 2f;
 
-                var bala = new Bala(TipoBala.BalaTorreta, centroX, centroY, torre.AnguloRotacion);
+                // Crea una nueva bala disparada por la torreta, indicando tipo, posición inicial y ángulo de rotación
+                var bala = new Bala(
+                    TipoBala.BalaTorreta, // Tipo de bala (torreta)
+                    centroX,              // Posición X (centro de la torreta)
+                    centroY,              // Posición Y (centro de la torreta)
+                    torre.AnguloRotacion  // Ángulo de rotación actual de la torreta
+                );
+
+                // Agrega la bala a la lista de balas disparadas por torretas
                 balasTorreta.Add(bala);
             }
         }
@@ -382,8 +425,8 @@ namespace GrupalNaves
                     hudJuego?.ActualizarVida(naveJugador.Vida);
                     if (naveDestruida)
                     {
-                        MessageBox.Show("¡Nave destruida!");
-                        this.Close();
+                        MostrarMenuGameOver(); // <--- CAMBIO: Redirigir al menú de Game Over
+                        return; // Salir de este método ya que el juego ha terminado
                     }
                     continue;
                 }
@@ -417,8 +460,8 @@ namespace GrupalNaves
                         hudJuego?.ActualizarVida(naveJugador.Vida);
                         if (naveDestruida)
                         {
-                            MessageBox.Show("¡Nave destruida!");
-                            this.Close();
+                            MostrarMenuGameOver(); // <--- CAMBIO: Redirigir al menú de Game Over
+                            return; // Salir de este método
                         }
                     }
                 }
@@ -434,8 +477,8 @@ namespace GrupalNaves
                     hudJuego?.ActualizarVida(naveJugador.Vida);
                     if (naveDestruida)
                     {
-                        MessageBox.Show("¡Nave destruida!");
-                        this.Close();
+                        MostrarMenuGameOver(); // <--- CAMBIO: Redirigir al menú de Game Over
+                        return; // Salir de este método
                     }
                 }
             }
@@ -472,8 +515,8 @@ namespace GrupalNaves
                     hudJuego?.ActualizarVida(naveJugador.Vida);
                     if (naveDestruida)
                     {
-                        MessageBox.Show("¡Nave destruida!");
-                        this.Close();
+                        MostrarMenuGameOver(); // <--- CAMBIO: Redirigir al menú de Game Over
+                        return; // Salir de este método
                     }
                 }
             }
@@ -488,23 +531,105 @@ namespace GrupalNaves
             }
         }
 
+        // Este método se ejecuta automáticamente cuando el formulario se cierra
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
+            // Llama a la implementación base para asegurarse de que el cierre del formulario se gestione correctamente
             base.OnFormClosed(e);
 
+            // Libera los recursos gráficos del fondo del juego si existen
             fondoJuego?.Dispose();
+
+            // Detiene cualquier movimiento en curso si el gestor de movimiento está activo
             gestorMovimiento?.DetenerMovimiento();
 
+            // Detiene y libera el temporizador encargado de actualizar el juego
             timerActualizacionJuego?.Stop();
             timerActualizacionJuego?.Dispose();
 
+            // Detiene y libera el temporizador que gestiona el disparo de las torretas
             timerDisparoTorreta?.Stop();
             timerDisparoTorreta?.Dispose();
 
+            // Detiene y libera el temporizador que genera enemigos
             timerGeneracionEnemigos?.Stop();
             timerGeneracionEnemigos?.Dispose();
 
+            // Libera los recursos del HUD del juego si existen
             hudJuego?.Dispose();
+        }
+
+        /// <summary>
+        /// Muestra el menú de Game Over y maneja las opciones del usuario.
+        /// </summary>
+        private void MostrarMenuGameOver()
+        {
+            // Detener todos los timers del juego
+            timerActualizacionJuego?.Stop();
+            timerDisparoTorreta?.Stop();
+            timerGeneracionEnemigos?.Stop();
+            gestorMovimiento?.DetenerMovimiento(); // Detener también el movimiento de la nave
+
+            // Ocultar el formulario de juego actual
+            this.Hide();
+
+            var gameOverMenu = new MenuGameOver();
+
+            gameOverMenu.ReiniciarJuego += () =>
+            {
+                // Reiniciar el juego: Limpiar listas, reiniciar nave, etc.
+                ReiniciarEstadoJuego();
+                this.Show(); // Mostrar Form1 de nuevo
+            };
+
+            gameOverMenu.VolverAlMenuPrincipal += () =>
+            {
+                this.Close(); // Cerrar el formulario de juego actual
+                // Para volver al menú principal de forma limpia, lo más sencillo es reiniciar la aplicación.
+                // Esto hará que Program.cs se ejecute de nuevo y muestre el Menu inicial.
+                Application.Restart();
+            };
+
+            gameOverMenu.SalirDelJuego += () =>
+            {
+                Application.Exit(); // Cierra completamente la aplicación
+            };
+
+            gameOverMenu.MostrarMenuGameOver();
+        }
+
+        /// <summary>
+        /// Restablece el estado del juego para un nuevo inicio.
+        /// </summary>
+        private void ReiniciarEstadoJuego()
+        {
+            // Limpiar todas las listas de elementos del juego
+            balasEnemigos.Clear();
+            listaObstaculos.Clear();
+            torres.Clear();
+            balasTorreta.Clear();
+            balasJugador.Clear();
+            enemigos.Clear();
+
+            // Reiniciar la nave del jugador a su estado inicial
+            if (naveJugador != null)
+            {
+                naveJugador.Vida = 100; // O la vida inicial que desees
+                naveJugador.PosX = this.ClientSize.Width / 2;
+                naveJugador.PosY = this.ClientSize.Height - 200;
+                // Puedes también reestablecer su tipo si quieres que el jugador re-seleccione
+                // this.avionSeleccionado = TipoAvion.Avion1; // O dejar el último seleccionado
+            }
+
+            // Reiniciar el HUD
+            hudJuego = new HUD(this, naveJugador.Vida); // Crear una nueva instancia de HUD o resetear la existente
+
+            // Volver a inicializar el juego (esto configura las torres, nave, timers, etc.)
+            InicializarJuego();
+            this.Focus();
+            this.ActiveControl = null;
+            this.Select();
+            this.Invalidate();
         }
     }
 }
