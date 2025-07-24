@@ -190,16 +190,21 @@ namespace GrupalNaves
                     navePreview.Dibujar(g, navePreview.Escala); // Usará navePreview.PosX y navePreview.PosY
 
                 }
+                // Se asigna el bitmap generado al PictureBox para mostrar la previsualización de la nave
                 pb.Image = bmp;
             }
+            // Captura de error específico si falta algún archivo necesario
             catch (FileNotFoundException ex)
             {
                 MessageBox.Show($"Error al cargar archivos para la previsualización: {ex.Message}\nAsegúrate de que los archivos 'bordes.txt' y 'coloreados.txt' para el avión '{tipo}' existen en la carpeta 'Assets\\Naves\\{tipo}'.", "Error de Archivo", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // En caso de error, se limpia la imagen del PictureBox
                 pb.Image = null;
             }
+            // Captura de cualquier otro tipo de excepción no controlada
             catch (Exception ex)
             {
                 MessageBox.Show($"Ocurrió un error al previsualizar la nave: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                // Se limpia la imagen del PictureBox ante errores
                 pb.Image = null;
             }
         }

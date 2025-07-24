@@ -171,16 +171,24 @@ namespace GrupalNaves
         /// funcion///
         private List<List<Point>> LeerBordes(string ruta)
         {
+            // Lista principal que contendrá varios grupos de puntos
             var grupos = new List<List<Point>>();
+
+            // Recorre cada línea del archivo ubicado en la ruta especificada
             foreach (var linea in File.ReadAllLines(ruta))
             {
                 if (string.IsNullOrWhiteSpace(linea) || linea.StartsWith("//")) continue;
+                // Divide la línea por espacios para obtener cada punto
                 var puntos = linea.Split(' ')
                                   .Select(p =>
                                   {
+                                      // Divide cada punto por coma para separar coordenadas X e Y
                                       var coords = p.Split(',');
+
+                                      // Crea un objeto Point a partir de las coordenadas y lo retorna
                                       return new Point(int.Parse(coords[0]), int.Parse(coords[1]));
-                                  }).ToList();
+                                  }).ToList(); // Convierte la colección a una lista
+                // Agrega el grupo de puntos a la lista principal
                 grupos.Add(puntos);
             }
             return grupos;

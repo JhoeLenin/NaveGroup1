@@ -13,50 +13,63 @@ namespace GrupalNaves
         // Cambiamos a float para todos los cálculos
         private const float VelocidadBase = 15f; // Nota la 'f' para indicar float
         private float velocidadActual = VelocidadBase;
-        
 
+
+        // Diccionario que mantiene el estado de teclas específicas (presionadas o no).
+        // Cada tecla está asociada a un valor booleano: true si está presionada, false si no.
         private readonly Dictionary<Keys, bool> teclasPresionadas = new Dictionary<Keys, bool>
         {
-            [Keys.W] = false,
-            [Keys.Up] = false,
-            [Keys.A] = false,
-            [Keys.Left] = false,
-            [Keys.S] = false,
-            [Keys.Down] = false,
-            [Keys.D] = false,
-            [Keys.Right] = false
+            [Keys.W] = false, // Tecla W (mover arriba)
+            [Keys.Up] = false, // Flecha arriba
+            [Keys.A] = false, // Tecla A (mover izquierda)
+            [Keys.Left] = false, // Flecha izquierda
+            [Keys.S] = false, // Tecla S (mover abajo)
+            [Keys.Down] = false, // Flecha abajo
+            [Keys.D] = false, // Tecla D (mover derecha)
+            [Keys.Right] = false // Flecha derecha
         };
 
+        // Constructor de la clase Movimiento. Recibe la nave que se moverá y el control donde se dibuja el juego.
         public Movimiento(Naves nave, Control superficieJuego)
         {
-            this.nave = nave;
-            this.superficieJuego = superficieJuego;
+            this.nave = nave; // Guarda la referencia de la nave a mover
+            this.superficieJuego = superficieJuego; // Guarda el área (control) donde se moverá la nave
 
-            superficieJuego.KeyDown += SuperficieJuego_KeyDown;
-            superficieJuego.KeyUp += SuperficieJuego_KeyUp;
+            // Se enlazan los eventos del teclado a los métodos manejadores
+            superficieJuego.KeyDown += SuperficieJuego_KeyDown; // Cuando se presiona una tecla
+            superficieJuego.KeyUp += SuperficieJuego_KeyUp; // Cuando se suelta una tecla
+
+            // Permite que el control capture las teclas especiales como flechas (de lo contrario, Windows las ignora en algunos controles)
             superficieJuego.PreviewKeyDown += (s, e) => e.IsInputKey = true;
 
+            // Se configura un temporizador para controlar el movimiento de la nave a intervalos regulares (aproximadamente 60 veces por segundo)
             temporizadorMovimiento = new System.Windows.Forms.Timer
             {
                 Interval = 16 // ≈60 FPS
             };
+            // Se asocia el evento Tick del temporizador al método que actualiza el movimiento
             temporizadorMovimiento.Tick += TemporizadorMovimiento_Tick;
         }
 
+        // Método para iniciar el temporizador de movimiento
         public void IniciarMovimiento()
         {
-            temporizadorMovimiento.Start();
+            temporizadorMovimiento.Start(); // Comienza a ejecutar el evento Tick periódicamente
         }
 
+        // Método para detener el temporizador de movimiento
         public void DetenerMovimiento()
         {
-            temporizadorMovimiento.Stop();
+            temporizadorMovimiento.Stop(); // Detiene la ejecución del evento Tick
         }
 
+        // Evento que se ejecuta cuando una tecla es presionada
         private void SuperficieJuego_KeyDown(object sender, KeyEventArgs e)
         {
+            // Verifica si la tecla presionada está registrada en el diccionario
             if (teclasPresionadas.ContainsKey(e.KeyCode))
             {
+                // Marca la tecla como presionada
                 teclasPresionadas[e.KeyCode] = true;
             }
         }

@@ -152,6 +152,7 @@ namespace GrupalNaves
             }
         }
 
+        // Método para leer los archivos de áreas coloreadas desde un archivo de texto.
         private List<(Color color, List<Point> puntos)> LeerColoreados(string ruta)
         {
             var grupos = new List<(Color, List<Point>)>();
@@ -164,10 +165,12 @@ namespace GrupalNaves
                     if (string.IsNullOrWhiteSpace(linea) || linea.StartsWith("//")) continue;
                     var partes = linea.Split(' ');
                     var colorPart = partes[0].Split(',');
+                    // Se crea el color a partir de los valores RGB
                     var color = Color.FromArgb(
                         int.Parse(colorPart[0]),
                         int.Parse(colorPart[1]),
                         int.Parse(colorPart[2]));
+                    // Se convierten los puntos del formato texto a objetos Point
                     var puntos = partes.Skip(1).Select(p =>
                     {
                         var coords = p.Split(',');
@@ -178,13 +181,14 @@ namespace GrupalNaves
             }
             return grupos;
         }
-
+        // Método para leer los archivos de bordes desde un archivo de texto.
         private List<List<Point>> LeerBordes(string ruta)
         {
             var grupos = new List<List<Point>>();
             foreach (var linea in File.ReadAllLines(ruta))
             {
                 if (string.IsNullOrWhiteSpace(linea) || linea.StartsWith("//")) continue;
+                // Se convierte cada punto de texto a un objeto Point
                 var puntos = linea.Split(' ')
                                     .Select(p =>
                                     {
