@@ -181,49 +181,56 @@ namespace GrupalNaves
                 // Debug.WriteLine($"Advertencia: Archivos de enemigo no encontrados en {BasePath}");
                 return;
             }
-
+            // Lee los datos de colores y bordes desde los archivos correspondientes
             var coloreados = LeerColoreados(rutaColoreados);
             var bordes = LeerBordes(rutaBordes);
 
+            // Calcula el ancho máximo entre todos los puntos coloreados
             int maxX = coloreados.Any() ? coloreados.Max(c => c.puntos.Any() ? c.puntos.Max(p => p.X) : 0) : 0;
+            // Calcula la altura máxima entre todos los puntos coloreados
             int maxY = coloreados.Any() ? coloreados.Max(c => c.puntos.Any() ? c.puntos.Max(p => p.Y) : 0) : 0;
 
+            // Calcula el ancho del bitmap final en base al valor máximo de X y una escala
             int width = (int)(maxX * escala) + 10;
-            if (width <= 0) width = 10;
+            if (width <= 0) width = 10;// Asegura que tenga al menos 10 píxeles de ancho
+            // Calcula la altura del bitmap final en base al valor máximo de Y y una escala
             int height = (int)(maxY * escala) + 10;
-            if (height <= 0) height = 10;
+            if (height <= 0) height = 10;// Asegura que tenga al menos 10 píxeles de alto
 
+            // Crea un nuevo bitmap con las dimensiones calculadas
             bitmapCache = new Bitmap(width, height);
+            // Dibuja sobre el bitmap usando gráficos
             using (var g = Graphics.FromImage(bitmapCache))
             {
-                g.Clear(Color.Transparent);
-                g.ScaleTransform(escala, escala);
+                g.Clear(Color.Transparent);// Limpia el fondo con transparencia
+                g.ScaleTransform(escala, escala);// Aplica la escala a los dibujos
 
+                // Dibuja cada grupo de puntos con su color correspondiente
                 foreach (var (color, puntos) in coloreados)
                 {
                     using (SolidBrush brush = new SolidBrush(color))
                     {
                         foreach (var p in puntos)
                         {
-                            g.FillRectangle(brush, p.X, p.Y, 2, 2);
+                            g.FillRectangle(brush, p.X, p.Y, 2, 2);// Dibuja un rectángulo de 2x2 en cada punto
                         }
                     }
                 }
-
+                // Dibuja los bordes usando líneas conectadas si hay más de un punto
                 foreach (var grupo in bordes)
                 {
                     if (grupo.Count > 1)
                     {
-                        g.DrawPolygon(Pens.Black, grupo.ToArray());
+                        g.DrawPolygon(Pens.Black, grupo.ToArray());// Dibuja un polígono con los puntos del grupo
                     }
                 }
             }
         }
-
+        // Método que lee puntos coloreados desde un archivo y los agrupa por color
         private List<(Color color, List<Point> puntos)> LeerColoreados(string ruta)
         {
             var grupos = new List<(Color, List<Point>)>();
-            if (!File.Exists(ruta)) return grupos;
+            if (!File.Exists(ruta)) return grupos; // Retorna vacío si el archivo no existe
 
             using (var fs = new FileStream(ruta, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (var sr = new StreamReader(fs))
@@ -231,39 +238,45 @@ namespace GrupalNaves
                 string linea;
                 while ((linea = sr.ReadLine()) != null)
                 {
-                    if (string.IsNullOrWhiteSpace(linea) || linea.StartsWith("//")) continue;
-                    var partes = linea.Split(' ');
-                    var colorPart = partes[0].Split(',');
+                    if (string.IsNullOrWhiteSpace(linea) || linea.StartsWith("//")) continue; // Ignora líneas vacías o comentarios
+                    var partes = linea.Split(' ');// Divide en partes por espacio
+                    var colorPart = partes[0].Split(',');// La primera parte es el color en formato R,G,B
+
+                    // Crea el color a partir de los componentes RGB
                     var color = Color.FromArgb(
                         int.Parse(colorPart[0]),
                         int.Parse(colorPart[1]),
                         int.Parse(colorPart[2]));
+
+                    // Convierte el resto de partes en puntos X,Y
                     var puntos = partes.Skip(1).Select(p =>
                     {
                         var coords = p.Split(',');
                         return new Point(int.Parse(coords[0]), int.Parse(coords[1]));
                     }).ToList();
+                    // Agrega el grupo de color y sus puntos
                     grupos.Add((color, puntos));
                 }
             }
             return grupos;
         }
-
+        // Método que lee los bordes desde un archivo y los agrupa en listas de puntos
         private List<List<Point>> LeerBordes(string ruta) 
         {
             var grupos = new List<List<Point>>();
-            if (!File.Exists(ruta)) return grupos;
+            if (!File.Exists(ruta)) return grupos;// Retorna vacío si el archivo no existe
 
+            // Lee todas las líneas del archivo
             foreach (var linea in File.ReadAllLines(ruta))
             {
-                if (string.IsNullOrWhiteSpace(linea) || linea.StartsWith("//")) continue;
+                if (string.IsNullOrWhiteSpace(linea) || linea.StartsWith("//")) continue; // Ignora líneas vacías o comentarios
                 var puntos = linea.Split(' ')
                                     .Select(p =>
                                     {
                                         var coords = p.Split(',');
                                         return new Point(int.Parse(coords[0]), int.Parse(coords[1]));
                                     }).ToList();
-                grupos.Add(puntos);
+                grupos.Add(puntos); // Agrega el grupo de puntos
             }
             return grupos;
         }
