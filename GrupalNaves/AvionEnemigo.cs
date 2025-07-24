@@ -80,13 +80,8 @@ namespace GrupalNaves
                 }
 
                 // Calcular ángulo de rotación para que mire al jugador
-                AnguloRotacion = (float)(Math.Atan2(dy, dx) * (180 / Math.PI)) - AnguloRotacionEnemigo; // +90 para ajuste de la imagen
+                AnguloRotacion = (float)(Math.Atan2(dy, dx) * (180 / Math.PI)) - AnguloRotacionEnemigo;
             }
-
-            // Mover y eliminar balas del enemigo que ya están en el Form1
-            // (La lógica de actualización y eliminación de balas de enemigos se maneja en Form1)
-
-            // El timerDisparo se encarga de la generación de balas.
         }
 
         // Dibuja el enemigo

@@ -369,11 +369,10 @@ namespace GrupalNaves
             g.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighSpeed;
             g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
 
-            // Dibujar elementos del juegooooo
-            // *** Asegúrate de que esta línea esté presente y sin comentarios ***
+            // Dibujar enemigo
             enemigos?.ForEach(enemigo => enemigo.Dibujar(g));
+            // dibujar balas del enemigo
             balasEnemigos.ForEach(bala => bala.Dibujar(g));
-            // prueba
             // Dibujar torres en orientacion hacia la nave jugador
             if (torres != null)
             {
@@ -406,12 +405,13 @@ namespace GrupalNaves
             balasJugador?.ForEach(bala => bala.Dibujar(g));
 
             /*listaObstaculos?.ForEach(obstaculo => obstaculo.Dibujar(g));*/
-
+            // dibujar naave jugador
             naveJugador?.Dibujar(g, naveJugador.Escala);
 
             hudJuego?.Dibujar(g);
         }
 
+        // Metodo para verificar colisiones
         private void VerificarColisiones()
         {
             if (naveJugador == null) return;

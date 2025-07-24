@@ -44,7 +44,7 @@ namespace GrupalNaves
                 return new RectangleF(PosX - width / 2, PosY - height / 2, width, height);
             }
         }
-
+        // Funcion booleana para recibir daño - inicia en false
         public bool RecibirDaño(int cantidad)
         {
             Vida -= cantidad; // Resta el daño a la propiedad Vida
@@ -52,7 +52,7 @@ namespace GrupalNaves
         }
 
         // Constructor que recibe el tipo de avión
-        public Naves(TipoAvion tipo, Form1 form) // Cambiado a Form1 en lugar de Form
+        public Naves(TipoAvion tipo, Form1 form)
         {
             this.formulario = form;
             Tipo = tipo;
@@ -72,9 +72,7 @@ namespace GrupalNaves
 
         public void Dibujar(Graphics g, float escala)
         {
-            // var coloreados = LeerColoreados(rutaColoreados); // No necesitas leer en cada dibujo
-            // var bordes = LeerBordes(rutaBordes); // No necesitas leer en cada dibujo
-
+            // Regenerar la escala en el cache
             if (bitmapCache == null || escala != lastEscala)
             {
                 RegenerarCache(escala);
@@ -85,9 +83,12 @@ namespace GrupalNaves
             try
             {
                 // Calcular ángulo hacia el cursor
+                // Variable tipo cursorpos para obtener la ubicacion del cursor
                 Point cursorPos = Form1.Instance.PointToClient(Cursor.Position);
+                // Distancia entre la punta del cursor y el centro de la imagen (x,y)
                 float dx = cursorPos.X - PosX;
                 float dy = cursorPos.Y - PosY;
+                // Formula matematica para calcular el angulo de rotacion par el avion
                 AnguloRotacion = (float)(Math.Atan2(dy, dx) * (180 / Math.PI)) + 90; // +90 para ajuste
 
                 g.TranslateTransform(PosX, PosY);
@@ -99,10 +100,10 @@ namespace GrupalNaves
                 g.Restore(estadoOriginal);
             }
         }
-
+        // Variable bitmap (mapa de bits) para tener una mejor carga de los puntos del avion
         private Bitmap bitmapCache;
         private float lastEscala = -1;
-
+        // Funcion para regenerar cache de las imagenes de aviones
         private void RegenerarCache(float escala)
         {
             if (bitmapCache != null)
@@ -112,17 +113,15 @@ namespace GrupalNaves
             var bordes = LeerBordes(rutaBordes);
 
             // Calcular tamaño necesario
-            // Asegurarse de que las listas no estén vacías para evitar errores de Max()
             int maxX = coloreados.Any() ? coloreados.Max(c => c.puntos.Any() ? c.puntos.Max(p => p.X) : 0) : 0;
             int maxY = coloreados.Any() ? coloreados.Max(c => c.puntos.Any() ? c.puntos.Max(p => p.Y) : 0) : 0;
 
-            // Asegurarse de que el tamaño mínimo sea razonable para evitar Bitmaps de 0x0
             int width = (int)(maxX * escala) + 10;
             if (width <= 0) width = 10; // Mínimo de 10px para evitar errores
             int height = (int)(maxY * escala) + 10;
             if (height <= 0) height = 10; // Mínimo de 10px para evitar errores
 
-
+            // Instancia de bitmapcache
             bitmapCache = new Bitmap(width, height);
             using (var g = Graphics.FromImage(bitmapCache))
             {
