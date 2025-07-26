@@ -151,8 +151,7 @@ namespace GrupalNaves
 
             balasTorreta = new List<Bala>();
 
-            // Inicializar nave jugador
-            //xd
+            // Inicializar nave jugador - con depuracion
             try
             {
                 naveJugador = new Naves(avionSeleccionado, this)
@@ -171,7 +170,7 @@ namespace GrupalNaves
                 return;
             }
 
-            // Limpiar y crear obstáculos
+            // Limpiar y crear obstáculos - opcional
             listaObstaculos.Clear();
             listaObstaculos.Add(new Obstaculos(50, 50, 260, 260, Color.DarkSlateGray, Color.Black, 2.0f));
             listaObstaculos.Add(new Obstaculos(350, 300, 260, 260, Color.Firebrick, Color.DarkRed, 3.0f));
@@ -356,6 +355,7 @@ namespace GrupalNaves
             }
         }
 
+        // Metodo que indica el movimiento del avion hacia donde se mueve el mouse ---- No se implemento
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
@@ -471,7 +471,7 @@ namespace GrupalNaves
                 }
             }
 
-            // Colisiones con balas de torreta
+            // Colisiones con balas de torreta al jugador
             for (int i = balasTorreta.Count - 1; i >= 0; i--)
             {
                 if (naveJugador.Bounds.IntersectsWith(balasTorreta[i].Bounds))
@@ -481,7 +481,7 @@ namespace GrupalNaves
                     hudJuego?.ActualizarVida(naveJugador.Vida);
                     if (naveDestruida)
                     {
-                        MostrarMenuGameOver(); // <--- CAMBIO: Redirigir al menú de Game Over
+                        MostrarMenuGameOver(); // Redirigir al menú de Game Over
                         return; // Salir de este método
                     }
                 }
@@ -563,9 +563,7 @@ namespace GrupalNaves
             hudJuego?.Dispose();
         }
 
-        /// <summary>
-        /// Muestra el menú de Game Over y maneja las opciones del usuario.
-        /// </summary>
+        // Muestra el menú de Game Over y maneja las opciones del usuario.
         private void MostrarMenuGameOver()
         {
             // Detener todos los timers del juego
@@ -602,9 +600,7 @@ namespace GrupalNaves
             gameOverMenu.MostrarMenuGameOver();
         }
 
-        /// <summary>
-        /// Restablece el estado del juego para un nuevo inicio.
-        /// </summary>
+        // Restablece el estado del juego para un nuevo inicio.
         private void ReiniciarEstadoJuego()
         {
             // Limpiar todas las listas de elementos del juego
